@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import os
 import re
-import signal
-import threading
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import library as lib
-from . import storage
+from . import lifecycle, storage
 from .analyzer import analyze_reference
 from .config import OUTPUT_DIR, PREVIEW_DIR, STATIC_DIR, find_afconvert, find_fluidsynth, find_soundfont
 from .engine import generate_preview, generate_session
@@ -36,9 +34,19 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def _no_cache(request: Request, call_next):
+    """Altijd de nieuwste versie van de webinterface tonen (geen verouderde pagina uit de browsercache)."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/sessions/") and not request.url.path.startswith("/api/preview/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.on_event("startup")
 def _startup() -> None:
     storage.ensure_dirs()
+    lifecycle.start_watchdog()
 
 
 # --------------------------------------------------------------------------- #
@@ -52,6 +60,7 @@ def health() -> dict:
         "afconvert": find_afconvert(),
         "output_dir": str(OUTPUT_DIR),
         "claude_env_key": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        **lifecycle.status(),
     }
 
 
@@ -76,7 +85,8 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
 @app.post("/api/generate", response_model=SessionResult)
 def generate(req: GenerateRequest) -> SessionResult:
     try:
-        return generate_session(req)
+        with lifecycle.busy():
+            return generate_session(req)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -84,7 +94,8 @@ def generate(req: GenerateRequest) -> SessionResult:
 @app.post("/api/preview", response_model=PreviewResult)
 def preview(req: GenerateRequest) -> PreviewResult:
     try:
-        return generate_preview(req)
+        with lifecycle.busy():
+            return generate_preview(req)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -120,9 +131,22 @@ def shutdown(request: Request) -> dict:
     host = request.client.host if request.client else ""
     if host not in LOCAL_HOSTS and not os.environ.get("BACKINGTRACK_ALLOW_REMOTE_SHUTDOWN"):
         raise HTTPException(403, "Stoppen kan alleen vanaf de Mac waarop BackingTrack draait.")
-    # Eerst het antwoord versturen, daarna uvicorn een nette stop-opdracht geven
-    threading.Timer(0.4, lambda: os.kill(os.getpid(), signal.SIGINT)).start()
+    lifecycle.request_shutdown()   # eerst het antwoord versturen, daarna netjes stoppen
     return {"status": "stopping"}
+
+
+@app.post("/api/heartbeat")
+def heartbeat(client: str) -> dict:
+    """Een geopende pagina meldt zich (elke 15 s). Zonder pagina's stopt de server vanzelf."""
+    lifecycle.heartbeat(client)
+    return lifecycle.status()
+
+
+@app.post("/api/bye")
+def bye(client: str) -> dict:
+    """Pagina wordt gesloten (sendBeacon)."""
+    lifecycle.bye(client)
+    return {"ok": True}
 
 
 @app.get("/api/sessions")

@@ -115,6 +115,7 @@ async function init() {
   updateHints();
   checkHealth();
   loadSessions();
+  startHeartbeat();
 }
 
 function bindEvents() {
@@ -408,6 +409,35 @@ async function checkHealth() {
   }
 }
 
+// ------------------------------------------------------------------ levensduur
+// De pagina meldt zich elke 15 s bij de server. Sluit je het laatste tabblad, dan stopt de
+// server na ~10 s vanzelf (nooit tijdens het genereren).
+const CLIENT_ID = Math.random().toString(36).slice(2) + Date.now().toString(36);
+let heartbeatTimer = null;
+async function heartbeat() {
+  try {
+    await fetch(`${API_BASE}/api/heartbeat?client=${CLIENT_ID}`, { method: "POST", keepalive: true });
+  } catch (_) {
+    if (document.visibilityState === "visible") showStopped(false);
+  }
+}
+function startHeartbeat() {
+  heartbeat();
+  heartbeatTimer = setInterval(heartbeat, 15000);
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") heartbeat(); });
+  window.addEventListener("pagehide", () => {
+    try { navigator.sendBeacon(`${API_BASE}/api/bye?client=${CLIENT_ID}`); } catch (_) {}
+  });
+}
+function showStopped(byUser) {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  document.body.innerHTML =
+    '<div class="min-h-screen grid place-items-center p-6 text-center">' +
+    '<div><div class="text-5xl mb-4">⏻</div><h1 class="text-xl font-semibold mb-2">BackingTrack is gestopt</h1>' +
+    `<p class="text-slate-400">${byUser ? "Je kunt dit tabblad sluiten." : "De server draait niet meer."} ` +
+    "Opnieuw starten: dubbelklik op het BackingTrack-icoon op je bureaublad.</p></div></div>";
+}
+
 // ------------------------------------------------------------------ server stoppen
 async function stopServer() {
   if (state.busy) { setStatus("Wacht tot het genereren klaar is.", "error"); return; }
@@ -418,10 +448,7 @@ async function stopServer() {
     setStatus("Stoppen mislukt: " + e.message, "error");
     return;
   }
-  document.body.innerHTML =
-    '<div class="min-h-screen grid place-items-center p-6 text-center">' +
-    '<div><div class="text-5xl mb-4">⏻</div><h1 class="text-xl font-semibold mb-2">BackingTrack is gestopt</h1>' +
-    '<p class="text-slate-400">Je kunt dit tabblad sluiten. Opnieuw starten: dubbelklik op het BackingTrack-icoon op je bureaublad.</p></div></div>';
+  showStopped(true);
 }
 
 init().catch((e) => setStatus("Kan de server niet bereiken: " + e.message, "error"));
