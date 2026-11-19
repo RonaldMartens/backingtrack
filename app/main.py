@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -170,17 +171,31 @@ def sessions() -> list[dict]:
 
 @app.get("/api/sessions/{session_id}")
 def session(session_id: str) -> dict:
+    """Een eerder gemaakt nummer openen (van de server óf van de HTML-app)."""
     try:
-        data = storage.load_session_json(session_id)
+        data = storage.load_session(session_id)
     except FileNotFoundError:
         data = None
     if not data:
         raise HTTPException(404, "Sessie niet gevonden")
-    data["files"] = storage.list_files(storage.session_path(session_id))
     return data
 
 
-@app.get("/api/sessions/{session_id}/files/{filename}")
+@app.post("/api/sessions/{session_id}/reveal")
+def session_reveal(session_id: str, request: Request) -> dict:
+    """Toon de map van het nummer in Finder (alleen vanaf de Mac zelf)."""
+    host = request.client.host if request.client else ""
+    if host not in LOCAL_HOSTS:
+        raise HTTPException(403, "Finder openen kan alleen op de Mac waarop BackingTrack draait.")
+    try:
+        path = storage.session_path(session_id)
+    except FileNotFoundError:
+        raise HTTPException(404, "Sessie niet gevonden")
+    subprocess.Popen(["open", str(path)])
+    return {"ok": True, "path": str(path)}
+
+
+@app.get("/api/sessions/{session_id}/files/{filename:path}")
 def session_file(session_id: str, filename: str) -> FileResponse:
     try:
         path = storage.session_file(session_id, filename)

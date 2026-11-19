@@ -214,7 +214,12 @@
             <a id="resZip" class="btn bg-amber-500 hover:bg-amber-400 text-black text-sm whitespace-nowrap" href="#">⬇︎ ZIP</a>
           </div>
         </div>
-        <audio id="mixAudio" controls class="w-full mt-4"></audio>
+        <div class="flex flex-wrap gap-2 mt-3 text-sm">
+          <button id="btnRestore" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200">⟳ Instellingen overnemen</button>
+          <button id="btnReveal" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200">📂 Toon in Finder</button>
+        </div>
+        <p id="playerLabel" class="text-xs text-slate-500 mt-3"></p>
+        <audio id="mixAudio" controls class="w-full mt-1"></audio>
         <div id="resWarnings" class="mt-3 space-y-1"></div>
         <h3 class="text-xs uppercase tracking-wider text-slate-500 mt-5 mb-2">Structuur</h3>
         <div id="timeline" class="flex h-9 rounded-lg overflow-hidden text-[10px] font-semibold text-white/90"></div>
@@ -226,10 +231,12 @@
 
       <div class="card p-4 sm:p-5">
         <div class="flex items-center justify-between mb-2">
-          <h2 class="font-semibold">Recente sessies</h2>
+          <h2 class="font-semibold">Mijn nummers <span id="sessionCount" class="text-xs text-slate-500 font-normal"></span></h2>
           <button id="btnRefresh" class="text-xs text-slate-400 hover:text-white">↻ vernieuwen</button>
         </div>
-        <div id="sessions" class="grid gap-1 text-sm"></div>
+        <input id="sessionSearch" class="inp mb-2" placeholder="Zoek op naam, toonsoort, genre of BPM…" autocomplete="off">
+        <div id="sessions" class="grid gap-1 text-sm max-h-96 overflow-y-auto pr-1"></div>
+        <p class="text-xs text-slate-500 mt-2">Alle nummers in je tracksmap, ook die je met de online HTML-app maakte. Klik om te openen.</p>
       </div>
     </section>
   </main>

@@ -134,6 +134,9 @@ function bindEvents() {
   $("btnGenerate").addEventListener("click", generate);
   $("btnPreview").addEventListener("click", preview);
   $("btnRefresh").addEventListener("click", loadSessions);
+  $("sessionSearch").addEventListener("input", renderSessions);
+  $("btnRestore").addEventListener("click", () => restoreSettings(state.lastResult));
+  $("btnReveal").addEventListener("click", revealSession);
   $("btnStop").addEventListener("click", stopServer);
   $("btnChords").addEventListener("click", openChords);
   $("btnCloseChords").addEventListener("click", closeChords);
@@ -314,13 +317,19 @@ function showResult(r) {
   $("resTitle").textContent = r.title || r.folder;
   const genreLabel = (state.options.genres.find((g) => g.value === r.genre) || {}).label || r.genre;
   $("resMeta").textContent =
-    `${genreLabel} · ${r.key} · ${r.bpm} BPM · ${r.bars} maten · ${fmtTime(r.duration_seconds)} · seed ${r.seed}`;
+    `${genreLabel} · ${r.key} · ${r.bpm} BPM · ${r.bars} maten · ${fmtTime(r.duration_seconds)}` +
+    (r.seed != null ? ` · seed ${r.seed}` : r.source === "studio" ? " · gemaakt met de HTML-app" : "");
   $("resZip").href = API_BASE + r.zip_url;
   $("resPath").textContent = r.path;
 
   const audio = $("mixAudio");
-  if (r.mix_url) { audio.classList.remove("hidden"); audio.src = API_BASE + r.mix_url; }
-  else { audio.classList.add("hidden"); audio.removeAttribute("src"); }
+  const playable = (r.files || []).filter((f) => f.kind === "audio" && !/aiff?$/i.test(f.name));
+  const firstAudio = playable.find((f) => !/count-in/i.test(f.name)) || playable[0];
+  if (r.mix_url) { audio.classList.remove("hidden"); audio.src = API_BASE + r.mix_url; $("playerLabel").textContent = "Volledige mix"; }
+  else if (firstAudio) { audio.classList.remove("hidden"); audio.src = API_BASE + firstAudio.url; $("playerLabel").textContent = `Speelt: ${firstAudio.name} (geen mix; klik ▶ bij een bestand om een andere stem te horen)`; }
+  else { audio.classList.add("hidden"); audio.removeAttribute("src"); $("playerLabel").textContent = ""; }
+  $("btnRestore").classList.toggle("hidden", !r.request);
+  $("btnReveal").classList.toggle("hidden", !r.id && !r.folder);
 
   const w = $("resWarnings");
   w.innerHTML = "";
@@ -356,14 +365,22 @@ function showResult(r) {
 
   const files = $("files");
   files.innerHTML = "";
-  r.files.forEach((f) => {
+  (r.files || []).forEach((f) => {
     const icon = f.kind === "midi" ? "🎹" : f.kind === "audio" ? "🔊" : "📄";
-    files.append(
-      el("a", { href: API_BASE + f.url, download: f.name,
-                class: "flex justify-between gap-3 px-3 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-800" },
+    const row = el("div", { class: "flex items-center gap-2" });
+    if (f.kind === "audio" && !/aiff?$/i.test(f.name)) {
+      const play = el("button", { class: "w-8 h-8 flex-none rounded-lg bg-slate-800 hover:bg-amber-500 hover:text-black", title: "Afspelen", text: "▶" });
+      play.addEventListener("click", () => {
+        audio.classList.remove("hidden"); audio.src = API_BASE + f.url; audio.play().catch(() => {});
+        $("playerLabel").textContent = `Speelt: ${f.name}`;
+      });
+      row.append(play);
+    } else row.append(el("span", { class: "w-8 flex-none" }));
+    row.append(el("a", { href: API_BASE + f.url, download: f.name.split("/").pop(),
+                class: "flex-1 min-w-0 flex justify-between gap-3 px-3 py-2 rounded-lg bg-slate-800/50 hover:bg-slate-800" },
         el("span", { class: "truncate", text: `${icon} ${f.name}` }),
-        el("span", { class: "text-slate-500 text-xs flex-none", text: fmtSize(f.size) }))
-    );
+        el("span", { class: "text-slate-500 text-xs flex-none", text: fmtSize(f.size) })));
+    files.append(row);
   });
   if (window.innerWidth < 1024) $("result").scrollIntoView({ behavior: "smooth" });
 }
@@ -377,24 +394,34 @@ async function openSession(id) {
   }
 }
 
+function renderSessions() {
+  const box = $("sessions"), q = $("sessionSearch").value.trim().toLowerCase();
+  const list = (state.sessions || []).filter((s) =>
+    !q || [s.id, s.title, s.key, s.genre, s.bpm && `${s.bpm}`].some((x) => x && String(x).toLowerCase().includes(q)));
+  box.innerHTML = "";
+  $("sessionCount").textContent = state.sessions ? `(${state.sessions.length})` : "";
+  if (!list.length) {
+    box.append(el("p", { class: "text-slate-500 text-sm", text: state.sessions && state.sessions.length ? "Geen nummers gevonden." : "Nog geen nummers." }));
+    return;
+  }
+  list.forEach((s) => {
+    const btn = el("button", { class: "text-left px-3 py-2 rounded-lg bg-slate-800/40 hover:bg-slate-800 w-full" });
+    const top = el("div", { class: "flex justify-between gap-3" },
+      el("span", { class: "truncate", text: s.title && s.title !== s.id ? s.title : s.id }),
+      el("span", { class: "text-slate-500 text-xs flex-none", text: (s.created || "").replace("T", " ").slice(0, 16) }));
+    const meta = [s.key, s.bpm ? `${s.bpm} BPM` : "", s.duration_seconds ? fmtTime(s.duration_seconds) : "",
+                  s.source === "studio" ? "HTML-app" : ""].filter(Boolean).join(" · ");
+    btn.append(top, el("div", { class: "text-xs text-slate-500 truncate", text: meta + (s.title && s.title !== s.id ? `  ·  ${s.id}` : "") }));
+    btn.addEventListener("click", () => openSession(s.id));
+    box.append(btn);
+  });
+}
+
 async function loadSessions() {
   const box = $("sessions");
   try {
-    const list = await api("/api/sessions");
-    box.innerHTML = "";
-    if (!list.length) {
-      box.append(el("p", { class: "text-slate-500 text-sm", text: "Nog geen sessies." }));
-      return;
-    }
-    list.slice(0, 15).forEach((s) => {
-      const btn = el("button", {
-        class: "text-left flex justify-between gap-3 px-3 py-2 rounded-lg bg-slate-800/40 hover:bg-slate-800 w-full",
-      },
-        el("span", { class: "truncate", text: s.id }),
-        el("span", { class: "text-slate-500 text-xs flex-none", text: (s.created || "").replace("T", " ").slice(0, 16) }));
-      btn.addEventListener("click", () => openSession(s.id));
-      box.append(btn);
-    });
+    state.sessions = await api("/api/sessions");
+    renderSessions();
   } catch (e) {
     box.textContent = "Kon sessies niet laden.";
   }
@@ -413,6 +440,44 @@ async function checkHealth() {
     b.textContent = "Server offline";
     b.className = "text-xs px-2 py-1 rounded-full bg-red-500/15 text-red-300";
   }
+}
+
+// ------------------------------------------------------------------ nummer opnieuw gebruiken
+function restoreSettings(r) {
+  const q = r && r.request;
+  if (!q) return;
+  if (r.profile && q.reference) { $("reference").value = q.reference; applyProfile(r.profile, q.reference); }
+  else clearProfile(true);
+  $("mood").value = q.mood || $("mood").value;
+  $("genre").value = q.genre || "auto";
+  $("key").value = [...$("key").options].some((o) => o.value === q.key) ? q.key : "auto";
+  const prog = q.progression_mode === "preset" ? "preset:" + q.progression_preset : q.progression_mode === "custom" ? "custom" : "auto";
+  $("progression").value = prog;
+  $("customProg").value = q.progression_custom || "";
+  updateProgression();
+  $("bpm").value = q.bpm;
+  const secs = q.duration_seconds || 240;
+  $("durMin").value = String(Math.min(10, Math.max(1, Math.floor(secs / 60))));
+  $("durSec").value = String([0, 15, 30, 45].reduce((a, b) => (Math.abs(b - secs % 60) < Math.abs(a - secs % 60) ? b : a), 0));
+  $("bridge").checked = !!q.bridge;
+  $("fade").checked = !!q.fade_outro;
+  $("fadeBarsWrap").classList.toggle("hidden", !q.fade_outro);
+  $("fadeBars").value = String(q.fade_bars || 8);
+  for (const [k, v] of Object.entries(q.instruments || {})) if ($("inst_" + k)) $("inst_" + k).checked = !!v;
+  $("fmtWav").checked = (q.formats || []).includes("wav");
+  $("fmtAiff").checked = (q.formats || []).includes("aiff");
+  $("seed").value = r.seed ?? "";
+  $("humanize").checked = q.humanize !== false;
+  updateHints();
+  setStatus("Instellingen van dit nummer staan klaar. Met dezelfde seed krijg je hetzelfde nummer, wis de seed voor een variatie.");
+  if (window.innerWidth < 1024) window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+async function revealSession() {
+  const r = state.lastResult;
+  if (!r) return;
+  try { await api(`/api/sessions/${encodeURIComponent(r.id || r.folder)}/reveal`, {}); }
+  catch (e) { setStatus("Finder openen mislukt: " + e.message, "error"); }
 }
 
 // ------------------------------------------------------------------ gitaarakkoorden

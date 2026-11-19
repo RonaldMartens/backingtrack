@@ -54,6 +54,15 @@ Maak eenmalig een icoon op je bureaublad:
 - Het logbestand staat in `~/Library/Logs/BackingTrack.log`.
 - Tip: sleep het icoon ook naar je Dock.
 
+### Eerder gemaakte nummers openen
+
+Rechtsonder staat **Mijn nummers**: alle nummers in je tracksmap, met een zoekveld. Daar horen ook de tracks bij die je met de online HTML-app maakte (die worden herkend aan hun *Lees mij - Logic Pro.txt*). Klik op een nummer om het te openen, met:
+- speler (de mix, of per stem afspelen met ▶);
+- bestanden en ZIP;
+- akkoordenschema en **🎸 Gitaarakkoorden**;
+- **⟳ Instellingen overnemen**, alleen bij nummers van de server: zet alle instellingen terug in de generator, inclusief de seed. Wis de seed voor een variatie;
+- **📂 Toon in Finder**: opent de map van het nummer, handig voor Logic.
+
 ### Gitaarakkoorden
 
 Bij elke track zit een knop **🎸 Gitaarakkoorden**. Die opent een overzicht met:
