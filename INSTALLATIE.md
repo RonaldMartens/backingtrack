@@ -37,12 +37,29 @@ je kunt er ook een kiezen met `BACKINGTRACK_SOUNDFONT=/pad/naar/bestand.sf2`.
 - iPhone (zelfde wifi): http://<jouw-mac>.local:8000. `start.sh` toont het juiste adres.
 - API-documentatie: http://localhost:8000/docs
 
+### Starten met een icoon (zonder Terminal)
+
+Maak eenmalig een icoon op je bureaublad:
+
+```bash
+./maak-bureaublad-icoon.sh
+```
+
+- **Dubbelklik op BackingTrack** start de server op de achtergrond en opent de app in je browser.
+- Staat de code op een externe schijf, dan gaan de tracks naar `<schijf>/BackingTrack Tracks`, anders naar `~/Music/BackingTrack`. Een andere map geef je mee als argument: `./maak-bureaublad-icoon.sh "/pad/naar/map"`.
+- **Stoppen:** klik in de app rechtsboven op **⏻ Stoppen**, of dubbelklik nogmaals op het icoon en kies **Stoppen**. Dat werkt alleen vanaf de Mac zelf, niet vanaf de iPhone.
+- Hangt de externe schijf er niet aan, dan meldt het icoon dat.
+- Het logbestand staat in `~/Library/Logs/BackingTrack.log`.
+- Tip: sleep het icoon ook naar je Dock.
+
 ## 3. Projectstructuur
 
 ```
 BackingTrack/
 ├── install.sh            # eenmalige installatie
 ├── start.sh              # server starten
+├── maak-bureaublad-icoon.sh  # BackingTrack.app op je bureaublad
+├── assets/BackingTrack.icns  # icoon
 ├── requirements.txt
 ├── app/
 │   ├── main.py           # FastAPI: routes, CORS, static files

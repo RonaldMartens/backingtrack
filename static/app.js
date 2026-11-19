@@ -133,6 +133,7 @@ function bindEvents() {
   $("btnGenerate").addEventListener("click", generate);
   $("btnPreview").addEventListener("click", preview);
   $("btnRefresh").addEventListener("click", loadSessions);
+  $("btnStop").addEventListener("click", stopServer);
   $("rememberKey").addEventListener("change", () => {
     store("bt_api_key", $("rememberKey").checked ? $("apiKey").value.trim() || null : null);
   });
@@ -405,6 +406,22 @@ async function checkHealth() {
     b.textContent = "Server offline";
     b.className = "text-xs px-2 py-1 rounded-full bg-red-500/15 text-red-300";
   }
+}
+
+// ------------------------------------------------------------------ server stoppen
+async function stopServer() {
+  if (state.busy) { setStatus("Wacht tot het genereren klaar is.", "error"); return; }
+  if (!confirm("BackingTrack stoppen? Je gegenereerde tracks blijven gewoon bewaard.")) return;
+  try {
+    await api("/api/shutdown", {});
+  } catch (e) {
+    setStatus("Stoppen mislukt: " + e.message, "error");
+    return;
+  }
+  document.body.innerHTML =
+    '<div class="min-h-screen grid place-items-center p-6 text-center">' +
+    '<div><div class="text-5xl mb-4">⏻</div><h1 class="text-xl font-semibold mb-2">BackingTrack is gestopt</h1>' +
+    '<p class="text-slate-400">Je kunt dit tabblad sluiten. Opnieuw starten: dubbelklik op het BackingTrack-icoon op je bureaublad.</p></div></div>';
 }
 
 init().catch((e) => setStatus("Kan de server niet bereiken: " + e.message, "error"));

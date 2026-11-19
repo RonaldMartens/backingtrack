@@ -16,5 +16,7 @@ echo "iPhone:  http://$HOST_NAME.local:$PORT   (zelfde wifi-netwerk)"
 echo "API-docs: http://localhost:$PORT/docs"
 echo
 
-( sleep 1.5 && open "http://localhost:$PORT" ) >/dev/null 2>&1 &
+if [ -z "${BT_NO_BROWSER:-}" ]; then
+  ( sleep 1.5 && open "http://localhost:$PORT" ) >/dev/null 2>&1 &
+fi
 exec "$VENV/bin/uvicorn" app.main:app --host 0.0.0.0 --port "$PORT"

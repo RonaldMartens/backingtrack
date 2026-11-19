@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import os
 import re
+import signal
+import threading
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -107,6 +109,20 @@ def session_preview(session_id: str) -> FileResponse:
         except FileNotFoundError:
             continue
     raise HTTPException(404, "Geen mix gevonden voor deze sessie")
+
+
+LOCAL_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
+@app.post("/api/shutdown")
+def shutdown(request: Request) -> dict:
+    """Stopt de server netjes. Alleen toegestaan vanaf de Mac zelf (niet vanaf iPhone/netwerk)."""
+    host = request.client.host if request.client else ""
+    if host not in LOCAL_HOSTS and not os.environ.get("BACKINGTRACK_ALLOW_REMOTE_SHUTDOWN"):
+        raise HTTPException(403, "Stoppen kan alleen vanaf de Mac waarop BackingTrack draait.")
+    # Eerst het antwoord versturen, daarna uvicorn een nette stop-opdracht geven
+    threading.Timer(0.4, lambda: os.kill(os.getpid(), signal.SIGINT)).start()
+    return {"status": "stopping"}
 
 
 @app.get("/api/sessions")
