@@ -13,3 +13,12 @@ venv/
 soundfonts/*.sf2
 soundfonts/*.sf3
 *.zip
+
+# Vangnet: gegenereerde tracks horen nooit in de repository
+*.wav
+*.aif
+*.aiff
+*.m4a
+*.mid
+BackingTrack Tracks/
+*_*BPM_*m*/

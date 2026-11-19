@@ -169,7 +169,7 @@ input.plain{font-family:inherit;font-size:15px}
       <button id="saveDir" disabled hidden>💾 Nu opslaan in opslagmap</button>
     </div>
     <div id="autoBox" hidden>
-      <label class="check"><input type="checkbox" id="autoSave" checked> Elke track automatisch opslaan in <b>~/Music/BackingTrack</b></label>
+      <label class="check"><input type="checkbox" id="autoSave" checked> Elke track automatisch opslaan in de opslagmap</label>
       <button id="linkDir">📁 Opslagmap koppelen…</button>
     </div>
     <p id="saveInfo" class="saveinfo"></p>
@@ -1853,7 +1853,7 @@ const idb=(mode,fn)=>new Promise((res,rej)=>{
 const saveInfo=(msg,ok=false)=>{$('saveInfo').textContent=msg;$('saveInfo').className='saveinfo'+(ok?' ok':'');};
 function showDir(){
   if(state.dir)saveInfo(`Opslagmap: ${state.dirLabel||state.dir.name} (submap per track)`,true);
-  else saveInfo('Nog geen opslagmap gekoppeld. Klik op “Opslagmap koppelen…” en kies je map Muziek (of ~/Music/BackingTrack).');
+  else saveInfo('Nog geen opslagmap gekoppeld. Klik op “Opslagmap koppelen…” en kies je map Muziek of je externe schijf.');
   $('linkDir').textContent=state.dir?'📁 Andere map…':'📁 Opslagmap koppelen…';
   $('saveDir').hidden=!state.dir;
 }
@@ -1880,16 +1880,33 @@ async function saveToDir(auto){
       const fh=await d.getFileHandle(parts[parts.length-1],{create:true}),w=await fh.createWritable();await w.write(f.data);await w.close();
     }
     saveInfo(`✓ Opgeslagen in ${state.dirLabel||state.dir.name}/${name}/ (${files.length} bestanden)`,true);
-  }catch(e){console.error(e);saveInfo('Opslaan in map mislukt: '+e.message);}
+  }catch(e){
+    console.error(e);
+    saveInfo(e.name==='NotFoundError'||e.name==='NotReadableError'
+      ?'Opslagmap niet gevonden: is de externe schijf aangesloten? Sluit hem aan en klik op “Nu opslaan”, of koppel de map opnieuw. Download ZIP werkt altijd.'
+      :'Opslaan in map mislukt: '+e.message);
+  }
 }
 if(window.showDirectoryPicker){
   $('autoBox').hidden=false;
   $('linkDir').onclick=async()=>{
     try{
       const picked=await window.showDirectoryPicker({id:'backingtrack',mode:'readwrite',startIn:'music'});
-      // Kies je de map Muziek, dan maken we daarin zelf “BackingTrack” aan
-      const dir=picked.name==='BackingTrack'?picked:await picked.getDirectoryHandle('BackingTrack',{create:true});
-      state.dir=dir;state.dirLabel=picked.name==='BackingTrack'?'BackingTrack':`${picked.name}/BackingTrack`;
+      // Nooit opslaan in de programmamap van de app zelf (daar staat de code + Git-repository)
+      const isAppDir=async d=>{try{await d.getFileHandle('BackingTrack Studio.html');return true;}catch(e){return false;}};
+      if(await isAppDir(picked)){
+        saveInfo('Dit is de programmamap van BackingTrack Studio. Kies de map erboven (bijv. je externe schijf) of je map Muziek.');
+        return;
+      }
+      // Kies je bv. Muziek of een externe schijf, dan maken we daarin zelf een submap aan
+      let dir,label;
+      if(/^backing ?tracks?( tracks)?$/i.test(picked.name)){dir=picked;label=picked.name;}
+      else{
+        let name='BackingTrack';
+        try{if(await isAppDir(await picked.getDirectoryHandle(name)))name='BackingTrack Tracks';}catch(e){}
+        dir=await picked.getDirectoryHandle(name,{create:true});label=`${picked.name}/${name}`;
+      }
+      state.dir=dir;state.dirLabel=label;
       try{await idb('readwrite',s=>{s.put(dir,'dir');s.put(state.dirLabel,'dirLabel');});}catch(e){}
       showDir();if(state.res)$('saveDir').disabled=false;
     }catch(e){if(e.name!=='AbortError'){console.error(e);saveInfo('Map koppelen mislukt: '+e.message);}}
