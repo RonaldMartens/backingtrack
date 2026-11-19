@@ -46,6 +46,7 @@ Maak eenmalig een icoon op je bureaublad:
 ```
 
 - **Dubbelklik op BackingTrack** start de server op de achtergrond en opent de app in je browser.
+- **Eerste start vanaf een externe schijf:** macOS vraagt *"BackingTrack wil toegang tot bestanden op een verwijderbaar volume"*. Kies **OK**. Heb je dat gemist, zet dan in *Systeeminstellingen › Privacy en beveiliging › Bestanden en mappen* bij BackingTrack **Verwijderbare volumes** aan. Het icoon opent dat scherm ook zelf als de toegang ontbreekt.
 - Staat de code op een externe schijf, dan gaan de tracks naar `<schijf>/BackingTrack Tracks`, anders naar `~/Music/BackingTrack`. Een andere map geef je mee als argument: `./maak-bureaublad-icoon.sh "/pad/naar/map"`.
 - **Stoppen:** klik in de app rechtsboven op **⏻ Stoppen**, of dubbelklik nogmaals op het icoon en kies **Stoppen**. Dat werkt alleen vanaf de Mac zelf, niet vanaf de iPhone.
 - Hangt de externe schijf er niet aan, dan meldt het icoon dat.
