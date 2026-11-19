@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="nl" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f1115">
+  <title>BackingTrack Generator</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <style>
+    :root { --accent: #f59e0b; }
+    body { background: #0f1115; -webkit-tap-highlight-color: transparent; }
+    .card { background: #171a21; border: 1px solid #262b36; border-radius: 1rem; }
+    .inp { width: 100%; background: #1f232c; border: 1px solid #2e3441; border-radius: .6rem;
+           padding: .6rem .75rem; color: #e8eaee; font-size: 16px; outline: none; }
+    .inp:focus { border-color: var(--accent); }
+    .lbl { display: block; font-size: .78rem; color: #9aa1ad; margin-bottom: .35rem; letter-spacing: .02em; }
+    .toggle { appearance: none; width: 2.75rem; height: 1.6rem; border-radius: 999px; background: #2e3441;
+              position: relative; cursor: pointer; transition: background .15s; flex: none; }
+    .toggle::after { content: ""; position: absolute; top: .2rem; left: .2rem; width: 1.2rem; height: 1.2rem;
+                     border-radius: 999px; background: #e8eaee; transition: transform .15s; }
+    .toggle:checked { background: var(--accent); }
+    .toggle:checked::after { transform: translateX(1.15rem); }
+    .chip input { display: none; }
+    .chip span { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .85rem; border-radius: 999px;
+                 border: 1px solid #2e3441; background: #1f232c; color: #9aa1ad; cursor: pointer; font-size: .9rem; }
+    .chip input:checked + span { border-color: var(--accent); color: #fbbf24; background: rgba(245,158,11,.12); }
+    input[type=range] { accent-color: var(--accent); }
+    .btn { border-radius: .7rem; padding: .7rem 1rem; font-weight: 600; transition: opacity .15s; }
+    .btn:disabled { opacity: .45; cursor: default; }
+    .spin { border: 3px solid rgba(255,255,255,.2); border-top-color: #fff; border-radius: 999px;
+            width: 1.1rem; height: 1.1rem; animation: s 0.8s linear infinite; display: inline-block; }
+    @keyframes s { to { transform: rotate(360deg); } }
+    .sec-intro { background: #475569; } .sec-verse { background: #2563eb; } .sec-chorus { background: #f59e0b; }
+    .sec-bridge { background: #a855f7; } .sec-solo { background: #ec4899; } .sec-interlude { background: #0d9488; }
+    .sec-outro { background: #64748b; }
+  </style>
+</head>
+<body class="min-h-full text-slate-200 antialiased">
+  <header class="border-b border-slate-800/80 sticky top-0 z-10 backdrop-blur bg-[#0f1115]/85">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 grid place-items-center text-xl">🎸</div>
+      <div class="flex-1 min-w-0">
+        <h1 class="text-lg font-semibold leading-tight">BackingTrack Generator</h1>
+        <p class="text-xs text-slate-400 truncate">MIDI + audio-stems voor Logic Pro</p>
+      </div>
+      <span id="healthBadge" class="text-xs px-2 py-1 rounded-full bg-slate-800 text-slate-400">…</span>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <!-- LINKERKOLOM: instellingen -->
+    <section class="space-y-5">
+      <!-- 1. Sfeer & referentie -->
+      <div class="card p-4 sm:p-5">
+        <h2 class="font-semibold mb-3">1 · Sfeer &amp; referentienummer</h2>
+        <label class="lbl" for="reference">Referentienummer (artiest – titel)</label>
+        <div class="flex gap-2">
+          <input id="reference" class="inp" list="refList" placeholder="bv. Gary Moore - Empty Rooms" autocomplete="off">
+          <button id="btnAnalyze" class="btn bg-slate-700 hover:bg-slate-600 text-white whitespace-nowrap">Analyseer sfeer</button>
+        </div>
+        <datalist id="refList"></datalist>
+
+        <details class="mt-3 group">
+          <summary class="text-sm text-slate-400 cursor-pointer select-none">Claude API-koppeling (optioneel)</summary>
+          <div class="mt-3 space-y-2">
+            <input id="apiKey" type="password" class="inp" placeholder="sk-ant-… (alleen nodig voor onbekende nummers)" autocomplete="off">
+            <div class="flex flex-wrap gap-4 text-sm text-slate-400">
+              <label class="flex items-center gap-2"><input id="useClaude" type="checkbox" class="toggle" checked> Claude gebruiken</label>
+              <label class="flex items-center gap-2"><input id="rememberKey" type="checkbox" class="toggle"> Onthoud op dit apparaat</label>
+            </div>
+            <p class="text-xs text-slate-500">De key gaat alleen naar je eigen server en wordt daar niet opgeslagen.</p>
+          </div>
+        </details>
+
+        <div id="analysis" class="hidden mt-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div id="anTitle" class="font-semibold text-amber-300"></div>
+              <div id="anSource" class="text-xs text-slate-400"></div>
+            </div>
+            <button id="btnClearProfile" class="text-xs text-slate-400 hover:text-white">✕ wissen</button>
+          </div>
+          <p id="anDesc" class="mt-2 text-slate-300"></p>
+          <div id="anChips" class="mt-2 flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <div class="mt-4">
+          <label class="lbl" for="mood">Sfeer / mood (zonder referentienummer)</label>
+          <select id="mood" class="inp"></select>
+        </div>
+      </div>
+
+      <!-- 2. Muziek -->
+      <div class="card p-4 sm:p-5">
+        <h2 class="font-semibold mb-3">2 · Muziek</h2>
+        <div class="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label class="lbl" for="genre">Genre</label>
+            <select id="genre" class="inp"></select>
+          </div>
+          <div>
+            <label class="lbl" for="key">Toonsoort</label>
+            <select id="key" class="inp"></select>
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="lbl" for="progression">Akkoordenschema</label>
+          <select id="progression" class="inp"></select>
+          <input id="customProg" class="inp mt-2 hidden font-mono" placeholder="Am - F - C - G   of   i - VI - III - VII   (Am:2 = 2 maten)">
+          <p id="progHint" class="text-xs text-slate-500 mt-1"></p>
+        </div>
+        <div class="mt-4">
+          <div class="flex items-center justify-between"><label class="lbl" for="bpm">Tempo</label>
+            <span class="text-sm"><span id="bpmVal" class="font-semibold text-amber-300">90</span> BPM</span></div>
+          <input id="bpm" type="range" min="50" max="180" value="90" class="w-full">
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <div>
+            <label class="lbl" for="durMin">Duur – minuten</label>
+            <select id="durMin" class="inp"></select>
+          </div>
+          <div>
+            <label class="lbl" for="durSec">seconden</label>
+            <select id="durSec" class="inp">
+              <option value="0">00</option><option value="15">15</option><option value="30">30</option><option value="45">45</option>
+            </select>
+          </div>
+        </div>
+        <p id="barsHint" class="text-xs text-slate-500 mt-2"></p>
+      </div>
+
+      <!-- 3. Structuur & instrumenten -->
+      <div class="card p-4 sm:p-5">
+        <h2 class="font-semibold mb-3">3 · Structuur &amp; instrumenten</h2>
+        <div class="space-y-3">
+          <label class="flex items-center justify-between gap-3">
+            <span><span class="block">Bridge in het midden</span>
+              <span class="text-xs text-slate-500">Contrasterende akkoorden met dynamische opbouw</span></span>
+            <input id="bridge" type="checkbox" class="toggle" checked>
+          </label>
+          <label class="flex items-center justify-between gap-3">
+            <span><span class="block">Fading outro</span>
+              <span class="text-xs text-slate-500">Uit = strak slotakkoord</span></span>
+            <input id="fade" type="checkbox" class="toggle" checked>
+          </label>
+          <div id="fadeBarsWrap" class="flex items-center justify-between gap-3">
+            <span class="text-sm text-slate-400">Fade-lengte</span>
+            <select id="fadeBars" class="inp !w-32"><option value="4">4 maten</option><option value="8" selected>8 maten</option></select>
+          </div>
+        </div>
+        <div class="mt-4">
+          <span class="lbl">Instrumenten</span>
+          <div id="instruments" class="flex flex-wrap gap-2"></div>
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-3 items-end">
+          <div>
+            <span class="lbl">Audio-export</span>
+            <div class="flex gap-2">
+              <label class="chip"><input type="checkbox" id="fmtWav" checked><span>WAV</span></label>
+              <label class="chip"><input type="checkbox" id="fmtAiff"><span>AIFF</span></label>
+            </div>
+          </div>
+          <div>
+            <label class="lbl" for="seed">Seed (optioneel)</label>
+            <input id="seed" type="number" class="inp" placeholder="willekeurig">
+          </div>
+        </div>
+        <label class="mt-3 flex items-center justify-between gap-3 text-sm">
+          <span>Menselijke timing/velocity (humanize)</span>
+          <input id="humanize" type="checkbox" class="toggle" checked>
+        </label>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 sticky bottom-3 z-10">
+        <button id="btnPreview" class="btn bg-slate-700 hover:bg-slate-600 text-white shadow-lg">▶︎ Snelle preview</button>
+        <button id="btnGenerate" class="btn bg-amber-500 hover:bg-amber-400 text-black shadow-lg">Genereer track</button>
+      </div>
+      <div id="status" class="text-sm text-slate-400 min-h-[1.25rem]"></div>
+    </section>
+
+    <!-- RECHTERKOLOM: resultaat -->
+    <section class="space-y-5">
+      <div id="previewCard" class="card p-4 sm:p-5 hidden">
+        <h2 class="font-semibold mb-2">Preview (refrein)</h2>
+        <audio id="previewAudio" controls class="w-full"></audio>
+      </div>
+
+      <div id="result" class="card p-4 sm:p-5 hidden">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h2 id="resTitle" class="font-semibold text-lg truncate"></h2>
+            <p id="resMeta" class="text-sm text-slate-400"></p>
+          </div>
+          <a id="resZip" class="btn bg-amber-500 hover:bg-amber-400 text-black text-sm whitespace-nowrap" href="#">⬇︎ ZIP</a>
+        </div>
+        <audio id="mixAudio" controls class="w-full mt-4"></audio>
+        <div id="resWarnings" class="mt-3 space-y-1"></div>
+        <h3 class="text-xs uppercase tracking-wider text-slate-500 mt-5 mb-2">Structuur</h3>
+        <div id="timeline" class="flex h-9 rounded-lg overflow-hidden text-[10px] font-semibold text-white/90"></div>
+        <div id="sections" class="mt-3 grid gap-1 text-sm"></div>
+        <h3 class="text-xs uppercase tracking-wider text-slate-500 mt-5 mb-2">Bestanden</h3>
+        <div id="files" class="grid gap-1 text-sm"></div>
+        <p class="text-xs text-slate-500 mt-4 break-all">Opgeslagen in: <span id="resPath"></span></p>
+      </div>
+
+      <div class="card p-4 sm:p-5">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="font-semibold">Recente sessies</h2>
+          <button id="btnRefresh" class="text-xs text-slate-400 hover:text-white">↻ vernieuwen</button>
+        </div>
+        <div id="sessions" class="grid gap-1 text-sm"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
