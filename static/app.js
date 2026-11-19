@@ -459,7 +459,7 @@ function renderSoloBox(r) {
   $("soloForm").classList.toggle("hidden", !canSolo);
   $("soloUnavailable").classList.toggle("hidden", canSolo);
   $("soloStatus").textContent = "";
-  const solos = r.solos || [];
+  const solos = (r.solos || []).filter((x) => x.after != null);   // oude (over een deel gelegde) solo's negeren
   $("soloInfo").textContent = solos.length ? `${solos.length} solo${solos.length > 1 ? "'s" : ""} in het nummer` : "";
   $("btnRemoveSolos").classList.toggle("hidden", !solos.length);
   $("btnSolos").textContent = solos.length ? "🎸 Solo's opnieuw maken" : "🎸 Solo's maken";
