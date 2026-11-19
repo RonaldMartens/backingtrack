@@ -225,12 +225,57 @@
           <button id="btnRestore" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200">⟳ Instellingen overnemen</button>
           <button id="btnReveal" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200">📂 Toon in Finder</button>
         </div>
-        <p id="playerLabel" class="text-xs text-slate-500 mt-3"></p>
+        <div class="flex items-center justify-between gap-2 mt-3">
+          <p id="playerLabel" class="text-xs text-slate-500 min-w-0 truncate"></p>
+          <div id="mixSwitch" class="hidden flex-none flex rounded-lg overflow-hidden text-xs">
+            <button id="mixWithSolo" class="px-2.5 py-1 bg-slate-800">🎸 Met solo</button>
+            <button id="mixNoSolo" class="px-2.5 py-1 bg-slate-800">Zonder solo</button>
+          </div>
+        </div>
         <audio id="mixAudio" controls class="w-full mt-1"></audio>
         <div id="resWarnings" class="mt-3 space-y-1"></div>
         <h3 class="text-xs uppercase tracking-wider text-slate-500 mt-5 mb-2">Structuur</h3>
         <div id="timeline" class="flex h-9 rounded-lg overflow-hidden text-[10px] font-semibold text-white/90"></div>
         <div id="sections" class="mt-3 grid gap-1 text-sm"></div>
+        <div id="soloBox" class="mt-5 rounded-xl border border-pink-500/30 bg-pink-500/5 p-3 sm:p-4">
+          <div class="flex items-baseline justify-between gap-2">
+            <h3 class="font-semibold">🎸 Gitaarsolo's</h3>
+            <span id="soloInfo" class="text-xs text-pink-300 text-right"></span>
+          </div>
+          <div id="soloForm">
+            <p class="text-xs text-slate-400 mt-1">Kies waar in het nummer een solo moet komen. Elk gekozen deel wordt een eigen solo
+              met een <b>aparte WAV en MIDI</b>. Elk bestand begint op maat 1: zet het in Logic gewoon op maat 1.</p>
+            <div id="soloSections" class="flex flex-wrap gap-1.5 mt-3"></div>
+            <div class="grid grid-cols-2 gap-3 mt-3">
+              <div>
+                <label class="lbl" for="soloStyle">Speelstijl</label>
+                <select id="soloStyle" class="inp">
+                  <option value="auto">Automatisch (past bij genre)</option>
+                  <option value="melodisch">Melodisch – zingend, ruimte</option>
+                  <option value="bluesy">Bluesy – bends &amp; vibrato</option>
+                  <option value="virtuoos">Virtuoos – snelle loopjes</option>
+                </select>
+              </div>
+              <div>
+                <label class="lbl" for="soloTone">Gitaarklank</label>
+                <select id="soloTone" class="inp">
+                  <option value="auto">Automatisch</option>
+                  <option value="overdrive">Overdrive</option>
+                  <option value="distortion">Distortion</option>
+                  <option value="clean">Clean</option>
+                  <option value="jazz">Jazzgitaar</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-3">
+              <button id="btnSolos" class="btn bg-pink-500 hover:bg-pink-400 text-black text-sm">🎸 Solo's toevoegen</button>
+              <button id="btnRemoveSolos" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm hidden">Solo's verwijderen</button>
+            </div>
+            <div id="soloStatus" class="text-xs text-slate-400 mt-2 min-h-[1rem]"></div>
+          </div>
+          <p id="soloUnavailable" class="hidden text-xs text-slate-400 mt-1">Solo's toevoegen kan bij nummers die met deze app zijn gemaakt.
+            Dit nummer komt uit de online HTML-app: gebruik daar ‘Genereer’ opnieuw of maak het hier opnieuw aan.</p>
+        </div>
         <h3 class="text-xs uppercase tracking-wider text-slate-500 mt-5 mb-2">Bestanden</h3>
         <div id="files" class="grid gap-1 text-sm"></div>
         <p class="text-xs text-slate-500 mt-4 break-all">Opgeslagen in: <span id="resPath"></span></p>

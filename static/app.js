@@ -139,6 +139,10 @@ function bindEvents() {
   $("btnReveal").addEventListener("click", revealSession);
   $("btnStop").addEventListener("click", stopServer);
   $("btnChords").addEventListener("click", openChords);
+  $("btnSolos").addEventListener("click", makeSolos);
+  $("btnRemoveSolos").addEventListener("click", removeSolos);
+  $("mixWithSolo").addEventListener("click", () => playMix(true));
+  $("mixNoSolo").addEventListener("click", () => playMix(false));
   $("btnCloseChords").addEventListener("click", closeChords);
   $("btnPrintChords").addEventListener("click", () => window.print());
   $("chordModal").addEventListener("click", (e) => { if (e.target.id === "chordModal") closeChords(); });
@@ -303,7 +307,9 @@ async function generate() {
   setStatus("Track genereren en renderen… (kan een halve minuut duren)", "info", true);
   try {
     const res = await api("/api/generate", buildRequest());
-    showResult(res);
+    let full = res;
+    try { full = { ...res, ...(await api(`/api/sessions/${encodeURIComponent(res.id)}`)) }; } catch (_) {}
+    showResult(full);   // volledige sessie: met opgeslagen instellingen (nodig voor solo's en ‘Instellingen overnemen’)
     setStatus(`Klaar: ${res.folder}`);
     loadSessions();
   } catch (e) {
@@ -327,7 +333,11 @@ function showResult(r) {
   const audio = $("mixAudio");
   const playable = (r.files || []).filter((f) => f.kind === "audio" && !/aiff?$/i.test(f.name));
   const firstAudio = playable.find((f) => !/count-in/i.test(f.name)) || playable[0];
-  if (r.mix_url) { audio.classList.remove("hidden"); audio.src = API_BASE + r.mix_url; $("playerLabel").textContent = "Volledige mix"; }
+  if (state.shownId !== r.id) { audio.pause(); audio.removeAttribute("src"); }
+  state.shownId = r.id;
+  $("mixSwitch").classList.toggle("hidden", !(r.mix_solo_url && r.mix_url));
+  if (r.mix_solo_url && r.mix_url) playMix(true, false);
+  else if (r.mix_url) { audio.classList.remove("hidden"); audio.src = API_BASE + r.mix_url; $("playerLabel").textContent = "Volledige mix"; }
   else if (firstAudio) { audio.classList.remove("hidden"); audio.src = API_BASE + firstAudio.url; $("playerLabel").textContent = `Speelt: ${firstAudio.name} (geen mix; klik ▶ bij een bestand om een andere stem te horen)`; }
   else { audio.classList.add("hidden"); audio.removeAttribute("src"); $("playerLabel").textContent = ""; }
   $("btnRestore").classList.toggle("hidden", !r.request);
@@ -348,7 +358,9 @@ function showResult(r) {
     });
     block.style.flexGrow = s.bars;
     block.style.opacity = 0.55 + s.energy * 0.45;
-    block.textContent = s.bars >= 6 ? s.label.replace("Couplet", "C").replace("Refrein", "R") : "";
+    const solo = soloAt(r, s);
+    block.textContent = (solo ? "🎸" : "") + (s.bars >= 6 ? s.label.replace("Couplet", "C").replace("Refrein", "R") : "");
+    if (solo) { block.style.boxShadow = "inset 0 -4px 0 #ec4899"; block.title += ` · Solo ${solo.number}`; }
     tl.append(block);
   });
 
@@ -360,7 +372,8 @@ function showResult(r) {
         el("span", { class: `sec-${s.name} w-2 h-2 rounded-full flex-none translate-y-[-1px]` }),
         el("span", { class: "w-24 flex-none text-slate-300", text: s.label }),
         el("span", { class: "hidden sm:inline w-20 flex-none text-slate-500 text-xs", text: `maat ${s.start_bar + 1}–${s.start_bar + s.bars}` }),
-        el("span", { class: "min-w-0 flex-1 text-slate-400 font-mono text-xs leading-relaxed break-words", text: s.chords.join(" · ") })
+        el("span", { class: "min-w-0 flex-1 text-slate-400 font-mono text-xs leading-relaxed break-words", text: s.chords.join(" · ") }),
+        soloAt(r, s) ? el("span", { class: "flex-none text-[10px] px-1.5 rounded bg-pink-500/20 text-pink-300", text: `🎸 solo ${soloAt(r, s).number}` }) : ""
       )
     )
   );
@@ -384,7 +397,96 @@ function showResult(r) {
         el("span", { class: "text-slate-500 text-xs flex-none", text: fmtSize(f.size) })));
     files.append(row);
   });
-  if (window.innerWidth < 1024) $("result").scrollIntoView({ behavior: "smooth" });
+  renderSoloBox(r);
+  if (window.innerWidth < 1024 && !state.keepScroll) $("result").scrollIntoView({ behavior: "smooth" });
+  state.keepScroll = false;
+}
+
+// ------------------------------------------------------------------ gitaarsolo's
+function soloAt(r, s) {
+  return (r.solos || []).find((x) => x.start_bar === s.start_bar && x.bars === s.bars);
+}
+
+function playMix(withSolo, autoplay = true) {
+  const r = state.lastResult, audio = $("mixAudio");
+  if (!r) return;
+  const url = withSolo ? r.mix_solo_url : r.mix_url;
+  if (!url) return;
+  const t = audio.src ? audio.currentTime : 0, wasPlaying = !audio.paused;
+  audio.classList.remove("hidden");
+  audio.src = API_BASE + url;
+  audio.addEventListener("loadedmetadata", () => { try { audio.currentTime = t; } catch (_) {} }, { once: true });
+  if (autoplay && wasPlaying) audio.play().catch(() => {});
+  $("playerLabel").textContent = withSolo ? "Volledige mix met solo's" : "Volledige mix zonder solo (om zelf te spelen)";
+  $("mixWithSolo").className = "px-2.5 py-1 " + (withSolo ? "bg-pink-500 text-black" : "bg-slate-800 hover:bg-slate-700");
+  $("mixNoSolo").className = "px-2.5 py-1 " + (!withSolo ? "bg-amber-500 text-black" : "bg-slate-800 hover:bg-slate-700");
+}
+
+function renderSoloBox(r) {
+  const canSolo = !!r.request;
+  $("soloForm").classList.toggle("hidden", !canSolo);
+  $("soloUnavailable").classList.toggle("hidden", canSolo);
+  $("soloStatus").textContent = "";
+  const solos = r.solos || [];
+  const st = r.solo_settings || {};
+  $("soloInfo").textContent = solos.length
+    ? `${solos.length} solo${solos.length > 1 ? "'s" : ""} · ${st.style || ""} · ${st.tone_label || ""}` : "";
+  $("btnSolos").textContent = solos.length ? "🎸 Nieuwe solo's maken" : "🎸 Solo's toevoegen";
+  $("btnRemoveSolos").classList.toggle("hidden", !solos.length);
+  if (st.style) $("soloStyle").value = solos.length ? st.style : "auto";
+  if (st.tone) $("soloTone").value = solos.length ? st.tone : "auto";
+  const box = $("soloSections");
+  box.innerHTML = "";
+  if (!canSolo) return;
+  const chosen = new Set(solos.length ? solos.map((x) => x.section)
+    : r.sections.map((s, i) => (s.name === "solo" ? i : -1)).filter((i) => i >= 0));
+  r.sections.forEach((s, i) => {
+    const cb = el("input", { type: "checkbox", value: String(i) });
+    cb.checked = chosen.has(i);
+    box.append(el("label", { class: "chip", title: `maat ${s.start_bar + 1}–${s.start_bar + s.bars}` },
+      cb, el("span", { text: `${s.label} · ${s.bars}m` })));
+  });
+  (r.solo_warnings || []).forEach((t) => ($("soloStatus").textContent += t + " "));
+}
+
+async function makeSolos() {
+  const r = state.lastResult;
+  if (!r || state.busy) return;
+  const sections = [...$("soloSections").querySelectorAll("input:checked")].map((c) => Number(c.value));
+  if (!sections.length) { $("soloStatus").textContent = "Vink eerst minimaal één deel aan waar de solo moet komen."; return; }
+  setBusy(true);
+  $("btnSolos").disabled = true;
+  $("soloStatus").innerHTML = "";
+  $("soloStatus").append(el("span", { class: "spin mr-2 align-middle" }),
+    document.createTextNode(`Gitaarsolo${sections.length > 1 ? "'s" : ""} maken en renderen…`));
+  try {
+    const res = await api(`/api/sessions/${encodeURIComponent(r.id)}/solos`, {
+      sections, style: $("soloStyle").value, tone: $("soloTone").value,
+    });
+    state.keepScroll = true;
+    showResult(res);
+    $("soloStatus").textContent = res.mix_solo_url
+      ? "Klaar! Luister met ‘Met solo’, of klik nog een keer voor een nieuwe variant."
+      : "Solo-MIDI gemaakt (geen audio: FluidSynth/SoundFont niet gevonden).";
+  } catch (e) {
+    $("soloStatus").textContent = "Solo maken mislukt: " + e.message;
+  } finally {
+    setBusy(false);
+    $("btnSolos").disabled = false;
+  }
+}
+
+async function removeSolos() {
+  const r = state.lastResult;
+  if (!r || state.busy || !confirm("Alle solo's van dit nummer verwijderen?")) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(r.id)}/solos`, { method: "DELETE" });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    state.keepScroll = true;
+    showResult(await res.json());
+  } catch (e) {
+    $("soloStatus").textContent = "Verwijderen mislukt: " + e.message;
+  }
 }
 
 async function openSession(id) {

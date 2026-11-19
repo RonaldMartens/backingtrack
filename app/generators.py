@@ -31,6 +31,7 @@ class TrackData:
     chorus: int
     notes: list[Note] = field(default_factory=list)
     expression: list[tuple[float, int]] = field(default_factory=list)   # (beat, CC11-waarde)
+    bends: list[tuple[int, int]] = field(default_factory=list)          # (tick, pitch bend -8192..8191)
 
 
 # GM drumnoten

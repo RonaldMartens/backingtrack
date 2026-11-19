@@ -19,10 +19,10 @@ from . import lifecycle, storage
 from .analyzer import analyze_reference
 from .guitar import chord_sheet
 from .config import OUTPUT_DIR, PREVIEW_DIR, STATIC_DIR, find_afconvert, find_fluidsynth, find_soundfont
-from .engine import generate_preview, generate_session
+from .engine import add_solos, generate_preview, generate_session, remove_solos
 from pydantic import BaseModel, Field
 
-from .models import AnalyzeRequest, AnalyzeResponse, GenerateRequest, PreviewResult, SessionResult
+from .models import AnalyzeRequest, AnalyzeResponse, GenerateRequest, PreviewResult, SessionResult, SoloRequest
 from .theory import key_options
 
 app = FastAPI(title="BackingTrack Generator", version="1.0.0",
@@ -203,6 +203,28 @@ def session_file(session_id: str, filename: str) -> FileResponse:
         raise HTTPException(404, "Bestand niet gevonden")
     media = storage.MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
     return FileResponse(path, media_type=media, filename=path.name if path.suffix == ".mid" else None)
+
+
+@app.post("/api/sessions/{session_id}/solos")
+def session_solos(session_id: str, req: SoloRequest) -> dict:
+    """Gitaarsolo's toevoegen (of opnieuw maken) over de gekozen delen van een bestaand nummer."""
+    try:
+        with lifecycle.busy():
+            return add_solos(session_id, req)
+    except FileNotFoundError:
+        raise HTTPException(404, "Sessie niet gevonden")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/api/sessions/{session_id}/solos")
+def session_solos_delete(session_id: str) -> dict:
+    try:
+        return remove_solos(session_id)
+    except FileNotFoundError:
+        raise HTTPException(404, "Sessie niet gevonden")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/api/sessions/{session_id}/zip")

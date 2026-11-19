@@ -72,6 +72,14 @@ class GenerateRequest(BaseModel):
     humanize: bool = True
 
 
+class SoloRequest(BaseModel):
+    """Gitaarsolo's toevoegen aan een bestaand nummer. Elke gekozen sectie = één solo (eigen WAV/MIDI)."""
+    sections: list[int] = Field(default_factory=list, max_length=12)   # indexen in session.sections
+    style: Literal["auto", "melodisch", "bluesy", "virtuoos"] = "auto"
+    tone: Literal["auto", "overdrive", "distortion", "clean", "jazz"] = "auto"
+    seed: Optional[int] = None
+
+
 class SectionInfo(BaseModel):
     name: str
     label: str

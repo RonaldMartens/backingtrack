@@ -160,3 +160,20 @@ bij een fout terug op de lokale schatting. De key wordt niet op de server opgesl
 
 CORS staat standaard open (`*`); beperk dit met `BACKINGTRACK_CORS=https://...`.
 Andere uitvoermap: `BACKINGTRACK_OUTPUT=/pad`.
+
+## Gitaarsolo's toevoegen
+
+Eerst genereer je het nummer, daarna voeg je solo's toe in het blok **🎸 Gitaarsolo's** onder de structuur:
+
+1. Vink de delen aan waar een solo moet komen (bijvoorbeeld *Solo*, *Bridge* of *Refrein 3*). Elk aangevinkt deel wordt één solo.
+2. Kies een **speelstijl**: *melodisch*, *bluesy* (met bends en vibrato) of *virtuoos* (snelle loopjes). Kies ook een **gitaarklank**: overdrive, distortion, clean of jazz. *Automatisch* kiest wat past bij het genre.
+3. Klik **Solo's toevoegen**. Klik nog een keer (**Nieuwe solo's maken**) voor een andere variant. Die vervangt de vorige.
+
+Per solo krijg je een aparte `06_Solo_<n>_<deel>.wav` en `.mid`:
+
+- Elk bestand is net zo lang als het nummer en begint op maat 1. Daardoor staat de solo in Logic op de juiste plek als je hem op maat 1 neerzet.
+- Daarnaast komt er `00_Mix_met_solo.wav`. De gewone `00_Mix` blijft zonder solo, zodat je zelf kunt meespelen.
+- In de speler wissel je met **Met solo** en **Zonder solo**.
+- Gebruik je de MIDI-solo met een eigen gitaarplugin, dan zitten de bends en het vibrato in de pitch bend (bereik ±2 halve tonen).
+
+Solo's kun je alleen toevoegen bij nummers die met deze app zijn gemaakt, niet bij tracks uit de online HTML-app.

@@ -110,6 +110,15 @@ def _track_events(track: TrackData, arr: Arrangement, with_fade: bool) -> list[t
         ev.insert(1, (0, "program_change", mido.Message("program_change", channel=ch, program=track.program)))
     for tick, val in _expression_events(track, arr, with_fade):
         ev.append((tick, "control_change", mido.Message("control_change", channel=ch, control=11, value=val)))
+    if track.bends:
+        # Pitch-bend-bereik vastzetten op ±2 halve tonen (RPN 0), voor bends en vibrato
+        for cc, val in ((101, 0), (100, 0), (6, 2), (38, 0), (101, 127), (100, 127)):
+            ev.append((0, "control_change", mido.Message("control_change", channel=ch, control=cc, value=val)))
+        last = None
+        for tick, val in sorted(track.bends, key=lambda b: b[0]):
+            if val != last:
+                ev.append((tick, "control_change", mido.Message("pitchwheel", channel=ch, pitch=val)))
+                last = val
     for n in _clean_notes(track.notes):
         ev.append((n.tick, "note_on", mido.Message("note_on", channel=ch, note=n.pitch, velocity=n.vel)))
         ev.append((n.tick + n.dur, "note_off", mido.Message("note_off", channel=ch, note=n.pitch, velocity=0)))
