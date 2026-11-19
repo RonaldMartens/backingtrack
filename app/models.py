@@ -61,6 +61,8 @@ class GenerateRequest(BaseModel):
     progression_custom: Optional[str] = None
     bpm: int = Field(90, ge=50, le=180)
     duration_seconds: int = Field(240, ge=60, le=600)
+    song_name: Optional[str] = Field(None, max_length=80)   # eigen naam van het nummer (optioneel)
+    intro: bool = True
     bridge: bool = True
     fade_outro: bool = True
     fade_bars: int = Field(8, ge=4, le=8)

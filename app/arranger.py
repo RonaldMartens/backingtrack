@@ -61,6 +61,7 @@ class Plan:
     seed: int
     title: str
     reference: Optional[str]
+    song_name: str = ""
 
 
 @dataclass
@@ -170,10 +171,11 @@ def resolve_plan(req: GenerateRequest, preview: bool = False) -> Plan:
 
     seed = req.seed if req.seed is not None else random.randint(1, 999_999)
     profile.key = key.name
-    title = profile.title or (req.reference or "").strip() or lib.MOODS.get(profile.mood, {}).get("label", "")
+    song_name = (req.song_name or "").strip()
+    title = song_name or profile.title or (req.reference or "").strip() or lib.MOODS.get(profile.mood, {}).get("label", "")
     return Plan(profile=profile, key=key, bpm=req.bpm, verse=verse, chorus=chorus, bridge=bridge,
                 progression_texts={"verse": verse_txt, "chorus": chorus_txt, "bridge": bridge_txt},
-                warnings=warnings, seed=seed, title=title, reference=req.reference)
+                warnings=warnings, seed=seed, title=title, reference=req.reference, song_name=song_name)
 
 
 # --------------------------------------------------------------------------- #
@@ -205,10 +207,11 @@ def _fill(events: list[ChordEvent], start_beat: float, beats: float) -> list[Tim
     return out
 
 
-def build_arrangement(plan: Plan, duration_seconds: int, bridge: bool, fade: bool, fade_bars: int) -> Arrangement:
+def build_arrangement(plan: Plan, duration_seconds: int, bridge: bool, fade: bool, fade_bars: int,
+                      intro_on: bool = True) -> Arrangement:
     total = total_bars_for(duration_seconds, plan.bpm)
     u = _unit(plan.verse)
-    intro = 4 if total < 40 else 8
+    intro = (4 if total < 40 else 8) if intro_on else 0   # zonder intro: direct het couplet
     outro = (8 if fade_bars > 4 else 4) if fade else 4
     if total < 32:
         outro = 4
@@ -246,8 +249,9 @@ def build_arrangement(plan: Plan, duration_seconds: int, bridge: bool, fade: boo
 
     sections: list[Section] = []
     bar = 0
-    sections.append(Section("intro", "Intro", bar, intro, 0.3, 0.42))
-    bar += intro
+    if intro:
+        sections.append(Section("intro", "Intro", bar, intro, 0.3, 0.42))
+        bar += intro
     counts = {"verse": 0, "chorus": 0, "solo": 0}
     n_chorus = sum(1 for b in blocks if b[0] == "chorus")
     for kind, bars in blocks:

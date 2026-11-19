@@ -54,6 +54,11 @@ Maak eenmalig een icoon op je bureaublad:
 - Het logbestand staat in `~/Library/Logs/BackingTrack.log`.
 - Tip: sleep het icoon ook naar je Dock.
 
+### Naam en intro
+
+- **Naam van je nummer** (bovenaan, optioneel) wordt de titel en de mapnaam, bijv. `Zomeravond_Em_118BPM_4m`. Dat werkt met of zonder referentienummer. Leeg laten: de naam komt van de referentie of de sfeer.
+- **Intro** (bij Structuur): uit = het nummer begint direct met het couplet. De gekozen duur blijft gelijk.
+
 ### Eerder gemaakte nummers openen
 
 Rechtsonder staat **Mijn nummers**: alle nummers in je tracksmap, met een zoekveld. Daar horen ook de tracks bij die je met de online HTML-app maakte (die worden herkend aan hun *Lees mij - Logic Pro.txt*). Klik op een nummer om het te openen, met:

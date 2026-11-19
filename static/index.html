@@ -70,7 +70,9 @@
     <section class="space-y-5">
       <!-- 1. Sfeer & referentie -->
       <div class="card p-4 sm:p-5">
-        <h2 class="font-semibold mb-3">1 · Sfeer &amp; referentienummer</h2>
+        <h2 class="font-semibold mb-3">1 · Nummer, sfeer &amp; referentie</h2>
+        <label class="lbl" for="songName">Naam van je nummer (optioneel)</label>
+        <input id="songName" class="inp mb-3" maxlength="80" placeholder="bv. Zomeravond in Amsterdam" autocomplete="off">
         <label class="lbl" for="reference">Referentienummer (artiest – titel)</label>
         <div class="flex gap-2">
           <input id="reference" class="inp" list="refList" placeholder="bv. Gary Moore - Empty Rooms" autocomplete="off">
@@ -151,6 +153,11 @@
       <div class="card p-4 sm:p-5">
         <h2 class="font-semibold mb-3">3 · Structuur &amp; instrumenten</h2>
         <div class="space-y-3">
+          <label class="flex items-center justify-between gap-3">
+            <span><span class="block">Intro</span>
+              <span class="text-xs text-slate-500">Rustige opbouw aan het begin. Uit = direct het couplet</span></span>
+            <input id="intro" type="checkbox" class="toggle" checked>
+          </label>
           <label class="flex items-center justify-between gap-3">
             <span><span class="block">Bridge in het midden</span>
               <span class="text-xs text-slate-500">Contrasterende akkoorden met dynamische opbouw</span></span>

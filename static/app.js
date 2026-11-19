@@ -252,6 +252,7 @@ function buildRequest() {
   if ($("fmtAiff").checked) formats.push("aiff");
   const seed = $("seed").value.trim();
   return {
+    song_name: $("songName").value.trim() || null,
     reference: $("reference").value.trim() || null,
     profile: state.profile,
     mood: $("mood").value,
@@ -262,6 +263,7 @@ function buildRequest() {
     progression_custom: prog === "custom" ? $("customProg").value.trim() : null,
     bpm: parseInt($("bpm").value),
     duration_seconds: durationSeconds(),
+    intro: $("intro").checked,
     bridge: $("bridge").checked,
     fade_outro: $("fade").checked,
     fade_bars: parseInt($("fadeBars").value),
@@ -459,6 +461,8 @@ function restoreSettings(r) {
   const secs = q.duration_seconds || 240;
   $("durMin").value = String(Math.min(10, Math.max(1, Math.floor(secs / 60))));
   $("durSec").value = String([0, 15, 30, 45].reduce((a, b) => (Math.abs(b - secs % 60) < Math.abs(a - secs % 60) ? b : a), 0));
+  $("songName").value = q.song_name || "";
+  $("intro").checked = q.intro !== false;
   $("bridge").checked = !!q.bridge;
   $("fade").checked = !!q.fade_outro;
   $("fadeBarsWrap").classList.toggle("hidden", !q.fade_outro);

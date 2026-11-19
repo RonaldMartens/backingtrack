@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -26,6 +27,7 @@ def ensure_dirs() -> None:
 
 
 def camel(text: str, max_len: int = 24) -> str:
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()   # é → e
     words = re.findall(r"[A-Za-z0-9]+", text.replace("'", ""))
     out = "".join(w[:1].upper() + w[1:] for w in words)
     return out[:max_len]
@@ -40,6 +42,12 @@ def folder_name(genre: str, key_tag: str, title: str, mood: str, bpm: int, secon
         ref = lib.MOODS.get(mood, {}).get("tag", "Track")
     minutes = max(1, int(round(seconds / 60.0)))
     return f"{gtag}_{camel(key_tag, 6)}_{ref}_{bpm}BPM_{minutes}m"
+
+
+def song_folder_name(name: str, key_tag: str, bpm: int, seconds: float) -> str:
+    """Mapnaam voor een nummer met een eigen naam, bv. Zomeravond_Em_118BPM_4m."""
+    minutes = max(1, int(round(seconds / 60.0)))
+    return f"{camel(name, 40) or 'Nummer'}_{camel(key_tag, 6)}_{bpm}BPM_{minutes}m"
 
 
 def create_session_dir(base_name: str) -> Path:

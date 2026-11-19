@@ -86,13 +86,16 @@ def _mix(stems: dict[str, np.ndarray]) -> np.ndarray:
 def generate_session(req: GenerateRequest) -> SessionResult:
     plan = resolve_plan(req)
     instruments = _selected(req)
-    arr = build_arrangement(plan, req.duration_seconds, req.bridge, req.fade_outro, req.fade_bars)
+    arr = build_arrangement(plan, req.duration_seconds, req.bridge, req.fade_outro, req.fade_bars, req.intro)
     tracks = generate_tracks(arr, instruments, req.humanize)
     warnings = plan.warnings
 
     length_s, _, _ = _timing(arr, req.fade_outro)
-    base = storage.folder_name(plan.profile.genre, plan.key.folder_tag, plan.reference and plan.title or "",
-                               plan.profile.mood, plan.bpm, length_s)
+    if plan.song_name:
+        base = storage.song_folder_name(plan.song_name, plan.key.folder_tag, plan.bpm, length_s)
+    else:
+        base = storage.folder_name(plan.profile.genre, plan.key.folder_tag, plan.reference and plan.title or "",
+                                   plan.profile.mood, plan.bpm, length_s)
     folder = storage.create_session_dir(base)
 
     # MIDI
