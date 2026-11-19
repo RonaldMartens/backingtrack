@@ -74,9 +74,21 @@ function fmtTime(sec) {
 
 // ------------------------------------------------------------------ opties
 // Referentieveld bij het opstarten altijd leeg (de browser vult anders het laatst getypte nummer weer in)
+// Chrome ziet het veld anders als "gebruikersnaam" bij het API-sleutelveld en vult het zelf in.
+// Daarom: alleen-lezen tot je erin klikt (Chrome vult geen alleen-lezen velden), en een paar keer leegmaken
+// zolang je het veld nog niet hebt aangeraakt.
 function clearReferenceOnStart() {
-  $("reference").value = "";
+  const ref = $("reference");
+  if (!ref.dataset.touched) ref.value = "";
 }
+(function guardReference() {
+  const ref = $("reference");
+  const unlock = () => { ref.dataset.touched = "1"; ref.removeAttribute("readonly"); };
+  ref.addEventListener("focus", unlock);
+  ref.addEventListener("pointerdown", unlock);
+  [300, 1000, 2500].forEach((t) => setTimeout(clearReferenceOnStart, t));
+  setTimeout(() => ref.removeAttribute("readonly"), 3000);   // daarna altijd gewoon bewerkbaar
+})();
 window.addEventListener("pageshow", (e) => { if (e.persisted) { clearReferenceOnStart(); if (state.profile) clearProfile(false); } });
 
 async function init() {
@@ -558,7 +570,7 @@ async function checkHealth() {
 function restoreSettings(r) {
   const q = r && r.request;
   if (!q) return;
-  if (r.profile && q.reference) { $("reference").value = q.reference; applyProfile(r.profile, q.reference); }
+  if (r.profile && q.reference) { $("reference").dataset.touched = "1"; $("reference").removeAttribute("readonly"); $("reference").value = q.reference; applyProfile(r.profile, q.reference); }
   else clearProfile(true);
   $("mood").value = q.mood || $("mood").value;
   $("genre").value = q.genre || "auto";
