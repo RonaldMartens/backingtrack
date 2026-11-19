@@ -357,8 +357,8 @@ function showResult(r) {
       el("div", { class: "flex gap-2 items-baseline" },
         el("span", { class: `sec-${s.name} w-2 h-2 rounded-full flex-none translate-y-[-1px]` }),
         el("span", { class: "w-24 flex-none text-slate-300", text: s.label }),
-        el("span", { class: "w-20 flex-none text-slate-500 text-xs", text: `maat ${s.start_bar + 1}–${s.start_bar + s.bars}` }),
-        el("span", { class: "text-slate-400 truncate font-mono text-xs", text: s.chords.join(" · ") })
+        el("span", { class: "hidden sm:inline w-20 flex-none text-slate-500 text-xs", text: `maat ${s.start_bar + 1}–${s.start_bar + s.bars}` }),
+        el("span", { class: "min-w-0 flex-1 text-slate-400 font-mono text-xs leading-relaxed break-words", text: s.chords.join(" · ") })
       )
     )
   );
@@ -540,7 +540,7 @@ async function openChords() {
   r.sections.forEach((s) =>
     secs.append(el("div", { class: "flex gap-3" },
       el("span", { class: "w-24 flex-none text-slate-400", text: s.label }),
-      el("span", { class: "font-mono text-slate-200", text: s.chords.join("  ·  ") })))
+      el("span", { class: "min-w-0 flex-1 font-mono text-slate-200 leading-relaxed break-words", text: s.chords.join("  ·  ") })))
   );
   const grid = $("chordGrid");
   grid.innerHTML = '<p class="text-slate-400 text-sm">Grepen berekenen…</p>';
