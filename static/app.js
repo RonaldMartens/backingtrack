@@ -160,6 +160,10 @@ function bindEvents() {
   $("btnDelete").addEventListener("click", deleteSession);
   $("btnStop").addEventListener("click", stopServer);
   $("btnChords").addEventListener("click", openChords);
+  $("btnSoloGuide").addEventListener("click", openSoloGuide);
+  $("btnCloseSolo").addEventListener("click", closeSoloGuide);
+  $("btnPrintSolo").addEventListener("click", () => window.print());
+  $("soloModal").addEventListener("click", (e) => { if (e.target.id === "soloModal") closeSoloGuide(); });
   $("btnSolos").addEventListener("click", () => makeSolos(false));
   $("btnRemoveSolos").addEventListener("click", () => makeSolos(true));
   $("btnAddSolo").addEventListener("click", addSoloRow);
@@ -168,7 +172,7 @@ function bindEvents() {
   $("btnCloseChords").addEventListener("click", closeChords);
   $("btnPrintChords").addEventListener("click", () => window.print());
   $("chordModal").addEventListener("click", (e) => { if (e.target.id === "chordModal") closeChords(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChords(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeChords(); closeSoloGuide(); } });
   $("rememberKey").addEventListener("change", () => {
     store("bt_api_key", $("rememberKey").checked ? $("apiKey").value.trim() || null : null);
   });
@@ -593,9 +597,9 @@ function renderSessions() {
     return;
   }
   list.forEach((s) => {
-    const btn = el("button", { class: "text-left px-3 py-2 rounded-lg bg-slate-800/40 hover:bg-slate-800 w-full" });
-    const top = el("div", { class: "flex justify-between gap-3" },
-      el("span", { class: "truncate", text: s.title && s.title !== s.id ? s.title : s.id }),
+    const btn = el("button", { class: "text-left px-3 py-2 rounded-lg bg-slate-800/40 hover:bg-slate-800 w-full min-w-0" });
+    const top = el("div", { class: "flex justify-between gap-3 min-w-0" },
+      el("span", { class: "truncate min-w-0", text: s.title && s.title !== s.id ? s.title : s.id }),
       el("span", { class: "text-slate-500 text-xs flex-none", text: (s.created || "").replace("T", " ").slice(0, 16) }));
     const meta = [s.key, s.bpm ? `${s.bpm} BPM` : "", s.duration_seconds ? fmtTime(s.duration_seconds) : "",
                   s.source === "studio" ? "HTML-app" : ""].filter(Boolean).join(" · ");
@@ -761,6 +765,212 @@ async function openChords() {
 function closeChords() {
   $("chordModal").classList.add("hidden");
   document.body.style.overflow = "";
+}
+
+// ------------------------------------------------------------------ soloschema
+const sg = { data: null, scale: null, box: null, chord: null, labels: "degrees" };
+const SG_STRING_NAMES = ["E", "A", "D", "G", "B", "e"];
+
+/* Fretboard: hoge e boven (zoals tab), frets 0..max. Toont de ladder; optioneel een positie en akkoordtonen. */
+function fretboard(opts) {
+  const { data, scale, box, chord, labels, from = 0, to = data.max_fret, mini = false } = opts;
+  const FW = mini ? 26 : 46, SS = mini ? 15 : 22, L = mini ? 22 : 40, T = mini ? 10 : 18;
+  const nF = to - from + 1;
+  const W = L + nF * FW + 10, H = T + SS * 5 + (mini ? 16 : 30);
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, class: "fretboard", width: "100%" });
+  if (!mini) svg.style.minWidth = "760px";
+  const xF = (f) => L + (f - from) * FW;                // rechterrand van fret f
+  const xN = (f) => (f === 0 ? L - (mini ? 10 : 18) : xF(f) - FW / 2);
+  const yS = (s) => T + (5 - s) * SS;                   // s=0 laag E onderaan
+  // fretdraden
+  for (let f = from; f <= to; f++) {
+    const x = f === 0 ? L : xF(f);
+    svg.append(svgEl("line", { x1: x, x2: x, y1: yS(5), y2: yS(0), stroke: "currentColor", "stroke-width": f === 0 ? 4 : 1, opacity: f === 0 ? 0.9 : 0.4 }));
+  }
+  if (from > 0) svg.append(svgEl("line", { x1: L, x2: L, y1: yS(5), y2: yS(0), stroke: "currentColor", "stroke-width": 1, opacity: 0.4 }));
+  // inlays
+  [3, 5, 7, 9, 12, 15, 17].filter((f) => f >= Math.max(1, from) && f <= to).forEach((f) => {
+    const cx = xF(f) - FW / 2, cy = (yS(0) + yS(5)) / 2;
+    if (f === 12) [-SS, SS].forEach((d) => svg.append(svgEl("circle", { cx, cy: cy + d, r: mini ? 2.5 : 4, fill: "currentColor", opacity: 0.18 })));
+    else svg.append(svgEl("circle", { cx, cy, r: mini ? 2.5 : 4, fill: "currentColor", opacity: 0.18 }));
+  });
+  // snaren
+  for (let s = 0; s < 6; s++) {
+    svg.append(svgEl("line", { x1: from === 0 ? L : L, x2: xF(to), y1: yS(s), y2: yS(s), stroke: "currentColor", "stroke-width": 0.8 + (5 - s) * 0.25, opacity: 0.75 }));
+    if (!mini) svg.append(svgEl("text", { x: 6, y: yS(s) + 4, "font-size": 11, fill: "currentColor", opacity: 0.6 }, SG_STRING_NAMES[s]));
+  }
+  // fretnummers
+  for (let f = Math.max(from, 1); f <= to; f++)
+    if (!mini || [3, 5, 7, 9, 12, 15].includes(f) || f === from)
+      svg.append(svgEl("text", { x: xF(f) - FW / 2, y: H - (mini ? 3 : 8), "text-anchor": "middle", "font-size": mini ? 8 : 10, fill: "currentColor", opacity: 0.55 }, String(f)));
+  // noten
+  const pcs = new Set(scale.pcs);
+  const blue = new Set(scale.id === "blues" ? [(data.root_pc + 6) % 12] : scale.id === "major_blues" ? [(data.root_pc + 3) % 12] : []);
+  const inBox = box ? new Set(box.notes.map(([s, f]) => `${s}:${f}`)) : null;
+  const chordPcs = chord ? new Map(chord.tones.map((t) => [t.pc, t.role])) : null;
+  const R = mini ? 5.5 : 9;
+  for (let s = 0; s < 6; s++) {
+    for (let f = from; f <= to; f++) {
+      const pc = (data.open[s] + f) % 12;
+      const isScale = pcs.has(pc), isChord = chordPcs && chordPcs.has(pc);
+      if (!isScale && !isChord) continue;
+      const boxOk = !inBox || inBox.has(`${s}:${f}`) || (isChord && f >= box.from && f <= box.to);
+      if (!boxOk && !mini) {
+        svg.append(svgEl("circle", { cx: xN(f), cy: yS(s), r: R * 0.45, fill: "currentColor", opacity: 0.18 }));
+        continue;
+      }
+      if (!boxOk) continue;
+      const root = pc === data.root_pc;
+      let fill = root ? "#f59e0b" : blue.has(pc) ? "#3b82f6" : "#475569";
+      let opacity = 1;
+      if (chordPcs && !isChord) opacity = 0.28;
+      if (chordPcs && isChord && !isScale) fill = "#9d174d";
+      const g = svgEl("g", { opacity });
+      g.append(svgEl("circle", { cx: xN(f), cy: yS(s), r: R, fill }));
+      if (isChord) g.append(svgEl("circle", { cx: xN(f), cy: yS(s), r: R + (mini ? 1.5 : 2.5), fill: "none", stroke: "#ec4899", "stroke-width": mini ? 1.5 : 2.5 }));
+      if (!mini) {
+        const lab = labels === "notes" || !scale.degrees[pc] ? data.pc_names[pc] : scale.degrees[pc];
+        g.append(svgEl("text", { x: xN(f), y: yS(s) + 3.6, "text-anchor": "middle", "font-size": lab.length > 2 ? 8 : 10, "font-weight": 700, fill: root ? "#111" : "#fff" }, lab));
+      }
+      svg.append(g);
+    }
+  }
+  return svg;
+}
+
+async function openSoloGuide() {
+  const r = state.lastResult;
+  if (!r) return;
+  $("sgTitle").textContent = `${r.title || r.folder} · ${r.key} · ${r.bpm} BPM`;
+  $("sgBody").innerHTML = '<p class="text-slate-400 text-sm">Soloschema berekenen…</p>';
+  $("soloModal").classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+  try {
+    sg.data = await api("/api/solo-guide", {
+      key: r.key, genre: r.genre || "",
+      sections: (r.sections || []).map((s) => ({ label: s.label, name: s.name, chords: s.chords || [] })),
+    });
+    sg.scale = sg.data.scales[0].id; sg.box = null; sg.chord = null;
+    renderSoloGuide();
+  } catch (e) {
+    $("sgBody").innerHTML = "";
+    $("sgBody").append(el("p", { class: "text-red-400 text-sm", text: "Kon het soloschema niet maken: " + e.message }));
+  }
+}
+
+function closeSoloGuide() {
+  if ($("soloModal").classList.contains("hidden")) return;
+  $("soloModal").classList.add("hidden");
+  document.body.style.overflow = "";
+}
+
+function sgButton(text, on, onClick, cls = "scale-chip") {
+  const b = el("button", { class: `${cls} ${on ? "on" : ""}`, text });
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+function renderSoloGuide() {
+  const d = sg.data, body = $("sgBody");
+  const scale = d.scales.find((x) => x.id === sg.scale) || d.scales[0];
+  const box = sg.box != null ? scale.boxes.find((b) => b.number === sg.box) : null;
+  body.innerHTML = "";
+
+  // 1. toonladders
+  const chips = el("div", { class: "flex flex-wrap gap-2 noprint" });
+  d.scales.forEach((sc, i) => chips.append(sgButton(`${i === 0 ? "★ " : ""}${sc.name}`, sc.id === scale.id, () => {
+    sg.scale = sc.id; sg.box = null; renderSoloGuide();
+  })));
+  body.append(el("h3", { class: "text-xs uppercase tracking-wider text-slate-500 mb-2", text: "Toonladders voor dit nummer" }), chips);
+  body.append(el("div", { class: "mt-3 rounded-lg bg-slate-800/40 px-3 py-2 text-sm" },
+    el("div", { class: "font-semibold text-amber-300", text: `${scale.name}: ${scale.note_names.join(" – ")}` }),
+    el("div", { class: "text-slate-300 text-xs mt-0.5", text: scale.why })));
+
+  // 2. hele hals
+  const tools = el("div", { class: "flex flex-wrap items-center gap-2 mt-4 noprint" });
+  tools.append(el("span", { class: "text-xs text-slate-500 mr-1", text: "Positie:" }));
+  tools.append(sgButton("Hele hals", sg.box == null, () => { sg.box = null; renderSoloGuide(); }));
+  scale.boxes.forEach((b) => tools.append(sgButton(`${b.number}${b.root_on_low_e ? " ★" : ""} (fret ${b.from}–${b.to})`, sg.box === b.number, () => { sg.box = b.number; renderSoloGuide(); })));
+  tools.append(el("span", { class: "flex-1" }));
+  tools.append(sgButton("Graden", sg.labels === "degrees", () => { sg.labels = "degrees"; renderSoloGuide(); }));
+  tools.append(sgButton("Nootnamen", sg.labels === "notes", () => { sg.labels = "notes"; renderSoloGuide(); }));
+  body.append(tools);
+  const wrap = el("div", { class: "fb-wrap overflow-x-auto mt-2 rounded-lg bg-slate-900/50 p-2" });
+  wrap.append(fretboard({ data: d, scale, box, chord: sg.chord, labels: sg.labels }));
+  body.append(wrap);
+  const legend = el("div", { class: "flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400 mt-2" });
+  const dot = (c, ring) => { const x = el("span", { class: "inline-block w-3 h-3 rounded-full align-middle mr-1" }); x.style.background = c; if (ring) x.style.boxShadow = "0 0 0 2px #ec4899"; return x; };
+  legend.append(el("span", {}, dot("#f59e0b"), "grondtoon"), el("span", {}, dot("#475569"), "ladder-toon"));
+  if (scale.id === "blues" || scale.id === "major_blues") legend.append(el("span", {}, dot("#3b82f6"), "blue note (doorgangsnoot)"));
+  legend.append(el("span", {}, dot("#475569", true), "doelnoot van het gekozen akkoord"));
+  if (sg.chord) legend.append(el("span", {}, dot("#9d174d", true), "doelnoot buiten de ladder (kleurtoon)"));
+  if (sg.chord) {
+    const clear = el("button", { class: "text-pink-300 hover:text-white", text: `✕ akkoord ${sg.chord.symbol} loslaten` });
+    clear.addEventListener("click", () => { sg.chord = null; renderSoloGuide(); });
+    legend.append(clear);
+  }
+  body.append(legend);
+
+  // 3. posities (mini-diagrammen, klikbaar en voor afdrukken)
+  body.append(el("h3", { class: "text-xs uppercase tracking-wider text-slate-500 mt-5 mb-2", text: `De ${scale.boxes.length} posities van ${scale.name}` }));
+  const grid = el("div", { class: "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3" });
+  scale.boxes.forEach((b) => {
+    const card = el("button", { class: `chordrow text-left rounded-lg p-2 border ${sg.box === b.number ? "border-amber-500 bg-amber-500/10" : "border-slate-800 bg-slate-900/40 hover:border-slate-600"}` });
+    card.append(el("div", { class: "text-xs text-slate-300 mb-1", text: `Positie ${b.number}${b.root_on_low_e ? " ★" : ""} · fret ${b.from}–${b.to}` }));
+    card.append(fretboard({ data: d, scale, box: b, chord: null, labels: sg.labels, from: Math.max(0, b.from - (b.from > 0 ? 1 : 0)), to: b.to + 1, mini: true }));
+    card.addEventListener("click", () => { sg.box = b.number; renderSoloGuide(); $("soloModal").scrollTo({ top: 0, behavior: "smooth" }); });
+    grid.append(card);
+  });
+  body.append(grid);
+  body.append(el("p", { class: "text-xs text-slate-500 mt-2", text: "★ = positie met de grondtoon op de lage E-snaar (vaak de makkelijkste start). Schuif van positie naar positie om over de hele hals te soleren." }));
+
+  // 4. per deel: wat past + doelnoten per akkoord
+  body.append(el("h3", { class: "text-xs uppercase tracking-wider text-slate-500 mt-5 mb-2", text: "Per deel van het nummer · klik een akkoord voor de doelnoten" }));
+  const names = Object.fromEntries(d.scales.map((x) => [x.id, x.name]));
+  const list = el("div", { class: "grid gap-2" });
+  d.sections.forEach((sec) => {
+    const row = el("div", { class: "chordrow rounded-lg bg-slate-800/30 px-3 py-2" });
+    const head = el("div", { class: "flex flex-wrap items-baseline gap-2" },
+      el("span", { class: `sec-${sec.name} w-2 h-2 rounded-full flex-none` }),
+      el("span", { class: "font-semibold text-slate-200 w-28 flex-none", text: sec.label }));
+    const fit = el("span", { class: "text-xs flex-1 min-w-0" });
+    if (sec.fits.length) {
+      fit.append(el("span", { class: "text-slate-500", text: "Past: " }));
+      sec.fits.forEach((id, i) => {
+        const b = el("button", { class: "text-emerald-300 hover:text-white underline-offset-2 hover:underline", text: names[id] });
+        b.addEventListener("click", () => { sg.scale = id; sg.box = null; renderSoloGuide(); });
+        fit.append(b);
+        if (i < sec.fits.length - 1) fit.append(document.createTextNode(" · "));
+      });
+    } else {
+      fit.append(el("span", { class: "text-pink-300", text: "Geen ladder past over het hele deel: wissel per akkoord (zie hieronder) of mik op de doelnoten." }));
+    }
+    head.append(fit);
+    row.append(head);
+    const chordsRow = el("div", { class: "flex flex-wrap gap-2 mt-2" });
+    sec.chords.forEach((c) => {
+      const on = sg.chord && sg.chord.symbol === c.symbol;
+      const b = el("button", { class: `text-left rounded-lg px-2.5 py-1.5 border text-xs ${on ? "border-pink-500 bg-pink-500/10" : "border-slate-700 hover:border-slate-500"}` });
+      b.append(el("div", { class: "font-mono font-semibold text-amber-300 text-sm", text: c.symbol }));
+      if (c.tones.length) b.append(el("div", { class: "text-slate-300", text: c.tones.map((t) => t.name).join(" · ") }));
+      const extra = [];
+      if (c.outside.length) extra.push(`kleurtoon: ${c.outside.join(", ")} (niet in de ★-ladder)`);
+      if (c.fits && c.fits.length && !sec.fits.length) extra.push(`speel: ${names[c.fits[0]]}`);
+      if (extra.length) b.append(el("div", { class: "text-slate-500", text: extra.join(" · ") }));
+      b.addEventListener("click", () => {
+        sg.chord = on ? null : c;
+        if (!on && c.fits && c.fits.length && !c.fits.includes(sg.scale)) sg.scale = c.fits[0];
+        renderSoloGuide();
+        $("soloModal").scrollTo({ top: 0, behavior: "smooth" });
+      });
+      chordsRow.append(b);
+    });
+    row.append(chordsRow);
+    list.append(row);
+  });
+  body.append(list);
+  body.append(el("p", { class: "text-xs text-slate-500 mt-3", text:
+    "Tip: speel vrij in de ★-toonladder en land op de sterke tellen (vooral bij een akkoordwissel) op een doelnoot van het akkoord dat op dat moment klinkt: grondtoon, terts of kwint. De terts maakt het verschil tussen ‘zomaar toonladder’ en ‘melodie’." }));
 }
 
 // ------------------------------------------------------------------ levensduur

@@ -18,6 +18,7 @@ from . import library as lib
 from . import lifecycle, storage
 from .analyzer import analyze_reference
 from .guitar import chord_sheet
+from .sologuide import solo_guide
 from .config import OUTPUT_DIR, PREVIEW_DIR, STATIC_DIR, find_afconvert, find_fluidsynth, find_soundfont
 from .engine import generate_preview, generate_session, set_solos
 from pydantic import BaseModel, Field
@@ -95,6 +96,27 @@ class GuitarChordsRequest(BaseModel):
 def guitar_chords(req: GuitarChordsRequest) -> dict:
     """Gitaargrepen (4 posities per akkoord) voor de akkoorden van een track."""
     return {"chords": chord_sheet([c.strip() for c in req.chords if c.strip()], req.key)}
+
+
+class SoloGuideSection(BaseModel):
+    label: str = ""
+    name: str = ""
+    chords: list[str] = Field(default_factory=list, max_length=64)
+
+
+class SoloGuideRequest(BaseModel):
+    key: str
+    genre: str = ""
+    sections: list[SoloGuideSection] = Field(default_factory=list, max_length=64)
+
+
+@app.post("/api/solo-guide")
+def solo_guide_route(req: SoloGuideRequest) -> dict:
+    """Soloschema: passende toonladders, posities op de hals en doelnoten per akkoord."""
+    try:
+        return solo_guide(req.key, [s.model_dump() for s in req.sections], req.genre)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.post("/api/generate", response_model=SessionResult)

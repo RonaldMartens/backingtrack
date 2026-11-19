@@ -188,3 +188,13 @@ Solo's toevoegen kan alleen bij nummers die met deze app zijn gemaakt, niet bij 
 ## Een nummer verwijderen
 
 Open het nummer (na het genereren, of via **Mijn nummers**) en klik **🗑 Verwijderen**. Na bevestiging gaat de hele map, met alle audio-, MIDI- en tekstbestanden, naar de **Prullenmand**. Staat het nummer op de externe schijf, dan gaat het naar de prullenmand van die schijf. Zolang je de prullenmand niet leegt, kun je het nummer terugzetten via Finder (*Zet terug*). Als het niet naar de prullenmand kan, wordt de map definitief verwijderd; de melding zegt dan welke van de twee er gebeurd is.
+
+## Soloschema
+
+Klik bij een nummer op **🎼 Soloschema** (naast *Gitaarakkoorden*). Je ziet:
+
+- **Toonladders voor dit nummer.** De ★-ladder (meestal pentatonisch) is de veilige basis voor het hele nummer. Daarnaast staan ladders die meer kleur geven, zoals natuurlijk mineur, Dorisch, Mixolydisch, blues of harmonisch mineur, met uitleg waarom ze passen.
+- **De hele hals** (fret 0–17) met alle tonen van de gekozen ladder: grondtoon in oranje, de b5-blue note in blauw. Wissel tussen **Graden** (1, b3, 4, 5, b7 …) en **Nootnamen**.
+- **De posities** op de hals. Klik er een aan en die positie licht op de grote hals op. ★ = de positie met de grondtoon op de lage E-snaar.
+- **Per deel van het nummer** welke ladders er passen, en de doelnoten (grondtoon, terts, kwint) van elk akkoord. Klik een akkoord aan en de doelnoten krijgen een roze ring op de hals. Akkoordtonen die niet in de ladder zitten (kleurtonen) zie je als roze noot met de nootnaam.
+- **🖨 Afdrukken** geeft een printvriendelijke versie.

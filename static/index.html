@@ -38,17 +38,27 @@
     .solo-row select { padding-top: .45rem; padding-bottom: .45rem; font-size: .85rem; }
     .chord-dia { color: #cbd5e1; }
     .chordrow { break-inside: avoid; page-break-inside: avoid; }
+    .fretboard { color: #cbd5e1; }
+    .scale-chip { padding: .35rem .7rem; border-radius: 999px; border: 1px solid #334155; font-size: .8rem; }
+    .scale-chip.on { border-color: #f59e0b; color: #fbbf24; background: rgba(245,158,11,.12); }
     @media print {
       body { background: #fff !important; }
-      body > *:not(#chordModal) { display: none !important; }
-      #chordModal { position: static !important; display: block !important; background: #fff !important; overflow: visible !important; }
-      #chordModal .chordsheet { background: #fff !important; border: 0 !important; color: #000 !important; max-width: none; margin: 0; padding: 0; }
-      #chordModal .text-slate-400, #chordModal .text-slate-300, #chordModal .text-slate-500 { color: #333 !important; }
-      #chordModal .text-slate-200 { color: #000 !important; }
-      #chordModal .text-amber-300 { color: #b45309 !important; }
-      #chordModal .border-slate-800 { border-color: #ccc !important; }
-      .chord-dia { color: #111 !important; }
+      body > *:not(.modal) { display: none !important; }
+      .modal.hidden { display: none !important; }
+      .modal { position: static !important; display: block !important; background: #fff !important; overflow: visible !important; }
+      .modal .chordsheet { background: #fff !important; border: 0 !important; color: #000 !important; max-width: none; margin: 0; padding: 0; }
+      .modal .text-slate-400, .modal .text-slate-300, .modal .text-slate-500 { color: #333 !important; }
+      .modal .text-slate-200 { color: #000 !important; }
+      .modal .text-amber-300 { color: #b45309 !important; }
+      .modal .border-slate-800 { border-color: #ccc !important; }
+      .chord-dia, .fretboard { color: #111 !important; }
+      .modal [class*="bg-slate-"], .modal [class*="bg-amber-500/"], .modal [class*="bg-pink-500/"] { background: transparent !important; }
+      .modal .text-emerald-300 { color: #047857 !important; }
+      .modal .text-pink-300 { color: #be185d !important; }
+      .modal .border-slate-700, .modal .border-slate-800 { border-color: #bbb !important; }
       .noprint { display: none !important; }
+      .fb-wrap { overflow: visible !important; }
+      .fb-wrap svg { min-width: 0 !important; width: 100% !important; }
     }
   </style>
 </head>
@@ -66,9 +76,9 @@
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto px-4 py-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+  <main class="max-w-6xl mx-auto px-4 py-5 grid gap-5 grid-cols-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
     <!-- LINKERKOLOM: instellingen -->
-    <section class="space-y-5">
+    <section class="space-y-5 min-w-0">
       <!-- 1. Sfeer & referentie -->
       <div class="card p-4 sm:p-5">
         <h2 class="font-semibold mb-3">1 · Nummer, sfeer &amp; referentie</h2>
@@ -205,20 +215,21 @@
     </section>
 
     <!-- RECHTERKOLOM: resultaat -->
-    <section class="space-y-5">
+    <section class="space-y-5 min-w-0">
       <div id="previewCard" class="card p-4 sm:p-5 hidden">
         <h2 class="font-semibold mb-2">Preview (refrein)</h2>
         <audio id="previewAudio" controls class="w-full"></audio>
       </div>
 
       <div id="result" class="card p-4 sm:p-5 hidden">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="min-w-0 flex-1 basis-48">
             <h2 id="resTitle" class="font-semibold text-lg truncate"></h2>
             <p id="resMeta" class="text-sm text-slate-400"></p>
           </div>
-          <div class="flex gap-2 flex-none">
+          <div class="flex flex-wrap gap-2">
             <button id="btnChords" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm whitespace-nowrap">🎸 Gitaarakkoorden</button>
+            <button id="btnSoloGuide" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm whitespace-nowrap">🎼 Soloschema</button>
             <a id="resZip" class="btn bg-amber-500 hover:bg-amber-400 text-black text-sm whitespace-nowrap" href="#">⬇︎ ZIP</a>
           </div>
         </div>
@@ -277,7 +288,7 @@
   </main>
 
   <!-- Gitaarakkoorden-overzicht -->
-  <div id="chordModal" class="hidden fixed inset-0 z-50 bg-black/75 overflow-y-auto">
+  <div id="chordModal" class="modal hidden fixed inset-0 z-50 bg-black/75 overflow-y-auto">
     <div class="chordsheet card max-w-5xl mx-auto my-4 sm:my-8 p-4 sm:p-6">
       <div class="flex items-start justify-between gap-3 mb-1">
         <div class="min-w-0">
@@ -292,6 +303,23 @@
       <div id="chordSections" class="text-sm mt-3 grid gap-1"></div>
       <p class="text-xs text-slate-500 mt-3 noprint">Standaardstemming E A D G B E · per akkoord 4 posities op de hals · cijfers = vingers (1 wijsvinger … 4 pink) · x = niet aanslaan, o = open snaar</p>
       <div id="chordGrid" class="mt-4 grid gap-5"></div>
+    </div>
+  </div>
+
+  <!-- Soloschema -->
+  <div id="soloModal" class="modal hidden fixed inset-0 z-50 bg-black/75 overflow-y-auto">
+    <div class="chordsheet card max-w-6xl mx-auto my-4 sm:my-8 p-4 sm:p-6">
+      <div class="flex items-start justify-between gap-3 mb-1">
+        <div class="min-w-0">
+          <h2 class="text-lg font-semibold">🎼 Soloschema</h2>
+          <p id="sgTitle" class="text-sm text-slate-400 truncate"></p>
+        </div>
+        <div class="flex gap-2 noprint flex-none">
+          <button id="btnPrintSolo" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm">🖨 Afdrukken</button>
+          <button id="btnCloseSolo" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm" title="Sluiten (Esc)">✕</button>
+        </div>
+      </div>
+      <div id="sgBody" class="mt-3"></div>
     </div>
   </div>
 
