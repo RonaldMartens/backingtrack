@@ -85,47 +85,113 @@ def _mix(stems: dict[str, np.ndarray]) -> np.ndarray:
     return renderer.normalize(mix)
 
 
-def generate_session(req: GenerateRequest) -> SessionResult:
+SOLO_PREFIX = "06_Solo_"
+SOLO_MIX = "00_Mix_met_solo"
+GENERATED_EXT = {".mid", ".wav", ".aiff", ".aif", ".m4a"}
+
+
+def _clear_generated(folder: Path) -> None:
+    """Oude stems/MIDI/mixen weg vóór het opnieuw opbouwen in dezelfde map (session.json blijft tot de nieuwe er is)."""
+    for p in folder.iterdir():
+        if p.is_file() and (p.suffix.lower() in GENERATED_EXT or p.name.endswith(".zip")) and p.name[:2].isdigit():
+            p.unlink(missing_ok=True)
+        elif p.is_file() and p.name.startswith(".") and p.name.endswith(".zip"):
+            p.unlink(missing_ok=True)
+
+
+def _solo_tracks(arr: Arrangement, req: GenerateRequest, solo_seed: int) -> tuple[list[TrackData], list[dict]]:
+    tracks, info = [], []
+    genre, mood = arr.plan.profile.genre, arr.plan.profile.mood
+    base = {s.base_index: s for s in arr.sections if s.base_index is not None}
+    for sec in arr.sections:
+        spec = sec.solo_spec
+        if spec is None:
+            continue
+        style = auto_style(genre) if spec.style == "auto" else spec.style
+        tone = auto_tone(genre, mood) if spec.tone == "auto" else spec.tone
+        after = base[spec.after]
+        tr = solo_track(arr, sec, sec.solo_no, style, tone, solo_seed, req.humanize)
+        tr.id = f"{SOLO_PREFIX}{sec.solo_no}_na{storage.camel(after.label, 18)}"
+        tr.name = f"Gitaarsolo {sec.solo_no}"
+        tracks.append(tr)
+        info.append({"number": sec.solo_no, "label": sec.label, "after": spec.after, "after_label": after.label,
+                     "start_bar": sec.start_bar, "bars": sec.bars, "style": style, "tone": tone,
+                     "tone_label": TONES[tone][1], "chords": spec.chords, "name": tr.id})
+    return tracks, info
+
+
+def _solo_chart(solos: list[dict]) -> str:
+    if not solos:
+        return ""
+    lines = ["", "Gitaarsolo's (elk audiobestand begint op maat 1):"]
+    for s in solos:
+        lines.append(f"  Gitaarsolo {s['number']}: na {s['after_label']}, maat {s['start_bar'] + 1}-"
+                     f"{s['start_bar'] + s['bars']} ({s['bars']} maten, {s['style']}, {s['tone_label']})"
+                     f"  ->  {s['name']}.wav / .mid")
+    return "\n".join(lines) + "\n"
+
+
+def generate_session(req: GenerateRequest, folder: Optional[Path] = None,
+                     keep: Optional[dict] = None) -> SessionResult:
+    """Nieuw nummer, of (met `folder`) een bestaand nummer in dezelfde map opnieuw opbouwen, bv. met solo's."""
     plan = resolve_plan(req)
     instruments = _selected(req)
-    arr = build_arrangement(plan, req.duration_seconds, req.bridge, req.fade_outro, req.fade_bars, req.intro)
+    arr = build_arrangement(plan, req.duration_seconds, req.bridge, req.fade_outro, req.fade_bars, req.intro,
+                            req.solos)
     tracks = generate_tracks(arr, instruments, req.humanize)
     warnings = plan.warnings
+    solo_seed = req.solo_seed if req.solo_seed is not None else random.randint(1, 999_999)
+    solo_tracks, solo_info = _solo_tracks(arr, req, solo_seed) if req.solos else ([], [])
+    if req.solos:
+        req = req.model_copy(update={"solo_seed": solo_seed})
 
     length_s, _, _ = _timing(arr, req.fade_outro)
-    if plan.song_name:
-        base = storage.song_folder_name(plan.song_name, plan.key.folder_tag, plan.bpm, length_s)
+    if folder is None:
+        if plan.song_name:
+            base = storage.song_folder_name(plan.song_name, plan.key.folder_tag, plan.bpm, length_s)
+        else:
+            base = storage.folder_name(plan.profile.genre, plan.key.folder_tag, plan.reference and plan.title or "",
+                                       plan.profile.mood, plan.bpm, length_s)
+        folder = storage.create_session_dir(base)
     else:
-        base = storage.folder_name(plan.profile.genre, plan.key.folder_tag, plan.reference and plan.title or "",
-                                   plan.profile.mood, plan.bpm, length_s)
-    folder = storage.create_session_dir(base)
+        _clear_generated(folder)
 
     # MIDI
     for t in tracks:
         meta = INSTRUMENT_META[t.id]
         write_stem(t, arr, folder / f"{meta['number']:02d}_{meta['file']}.mid", with_fade=req.fade_outro)
-    write_full(tracks, arr, folder / "00_Arrangement.mid", with_fade=req.fade_outro)
-    (folder / "Akkoorden.txt").write_text(chord_chart(arr), encoding="utf-8")
+    for t in solo_tracks:
+        write_stem(t, arr, folder / f"{t.id}.mid", with_fade=req.fade_outro)
+    write_full(tracks + solo_tracks, arr, folder / "00_Arrangement.mid", with_fade=req.fade_outro)
+    (folder / "Akkoorden.txt").write_text(chord_chart(arr) + _solo_chart(solo_info), encoding="utf-8")
 
     # Audio
-    stems = _render_tracks(tracks, arr, folder / ".render", req.fade_outro, warnings)
+    stems = _render_tracks(tracks + solo_tracks, arr, folder / ".render", req.fade_outro, warnings)
+    solo_ids = {t.id for t in solo_tracks}
     for tid, audio in stems.items():
-        meta = INSTRUMENT_META[tid]
-        stem_name = f"{meta['number']:02d}_{meta['file']}"
-        if "wav" in req.formats:
+        stem_name = tid if tid in solo_ids else f"{INSTRUMENT_META[tid]['number']:02d}_{INSTRUMENT_META[tid]['file']}"
+        if "wav" in req.formats or not req.formats:
             renderer.write(audio, folder / f"{stem_name}.wav", "WAV")
         if "aiff" in req.formats:
             renderer.write(audio, folder / f"{stem_name}.aiff", "AIFF")
-    mix_url = None
-    if stems:
-        mix = _mix(stems)
-        renderer.write(mix, folder / "00_Mix.wav", "WAV", "PCM_16")
+    sid = storage._url_id(folder.name)
+
+    def mix_file(name: str, parts: dict) -> Optional[str]:
+        if not parts:
+            return None
+        mix = _mix(parts)
+        renderer.write(mix, folder / f"{name}.wav", "WAV", "PCM_16")
         if "aiff" in req.formats:
-            renderer.write(mix, folder / "00_Mix.aiff", "AIFF")
-        if renderer.to_m4a(find_afconvert(), folder / "00_Mix.wav", folder / "00_Mix.m4a"):
-            mix_url = f"/api/sessions/{folder.name}/files/00_Mix.m4a"
-        else:
-            mix_url = f"/api/sessions/{folder.name}/files/00_Mix.wav"
+            renderer.write(mix, folder / f"{name}.aiff", "AIFF")
+        ext = "m4a" if renderer.to_m4a(find_afconvert(), folder / f"{name}.wav", folder / f"{name}.m4a") else "wav"
+        return f"/api/sessions/{sid}/files/{name}.{ext}"
+
+    backing = {k: v for k, v in stems.items() if k not in solo_ids}
+    mix_url = mix_file("00_Mix", backing)
+    mix_solo_url = None
+    if solo_ids & set(stems):
+        lead = {k: v * 1.1 for k, v in stems.items() if k in solo_ids}
+        mix_solo_url = mix_file(SOLO_MIX, {**backing, **lead})
 
     sections = []
     for s in arr.sections:
@@ -134,15 +200,19 @@ def generate_session(req: GenerateRequest) -> SessionResult:
             if not seen or seen[-1] != tc.chord.symbol:
                 seen.append(tc.chord.symbol)
         sections.append({"name": s.kind, "label": s.label, "start_bar": s.start_bar, "bars": s.bars,
-                         "energy": round((s.energy_start + s.energy_end) / 2, 2), "chords": seen[:16]})
+                         "energy": round((s.energy_start + s.energy_end) / 2, 2), "chords": seen[:16],
+                         "base_index": s.base_index, "solo": s.solo_no})
 
+    keep = keep or {}
     result = SessionResult(
-        id=folder.name, folder=folder.name, path=str(folder), created=datetime.now().isoformat(timespec="seconds"),
+        id=folder.name, folder=folder.name, path=str(folder),
+        created=keep.get("created") or datetime.now().isoformat(timespec="seconds"),
         title=plan.title, genre=plan.profile.genre, mood=plan.profile.mood, key=plan.key.name, bpm=plan.bpm,
         bars=arr.total_bars, duration_seconds=round(length_s, 1), requested_seconds=req.duration_seconds,
         seed=plan.seed, fade_outro=req.fade_outro, bridge=any(s.kind == "bridge" for s in arr.sections),
-        sections=sections, files=[], mix_url=mix_url, zip_url=f"/api/sessions/{folder.name}/zip",
-        audio_rendered=bool(stems), warnings=warnings, profile=plan.profile,
+        sections=sections, files=[], mix_url=mix_url, zip_url=f"/api/sessions/{sid}/zip",
+        audio_rendered=bool(stems), warnings=warnings, profile=plan.profile, solos=solo_info,
+        mix_solo_url=mix_solo_url,
     )
     data = result.model_dump()
     data["request"] = req.model_dump(exclude={"profile"})
@@ -178,14 +248,13 @@ def generate_preview(req: GenerateRequest) -> PreviewResult:
 
 
 # --------------------------------------------------------------------------- #
-# Gitaarsolo's achteraf toevoegen
+# Gitaarsolo's: het nummer opnieuw opbouwen (zelfde seed) met ingevoegde solodelen
 # --------------------------------------------------------------------------- #
-SOLO_PREFIX = "06_Solo_"
-SOLO_MIX = "00_Mix_met_solo"
-
-
-def _rebuild_arrangement(data: dict) -> tuple[GenerateRequest, Arrangement]:
-    """Zelfde instellingen + zelfde seed = exact hetzelfde arrangement als bij het genereren."""
+def set_solos(session_id: str, sreq: SoloRequest) -> dict:
+    folder = storage.session_path(session_id)
+    data = storage.load_session(session_id)
+    if not data:
+        raise ValueError("Nummer niet gevonden.")
     if not data.get("request"):
         raise ValueError("Solo's toevoegen kan alleen bij nummers die met deze app (server) zijn gemaakt, "
                          "niet bij tracks van de online HTML-app.")
@@ -193,123 +262,8 @@ def _rebuild_arrangement(data: dict) -> tuple[GenerateRequest, Arrangement]:
     req_data["seed"] = data.get("seed", req_data.get("seed"))
     if data.get("profile"):
         req_data["profile"] = data["profile"]
+    req_data["solos"] = [x.model_dump() for x in sreq.solos]
+    req_data["solo_seed"] = sreq.seed
     req = GenerateRequest(**req_data)
-    plan = resolve_plan(req)
-    arr = build_arrangement(plan, req.duration_seconds, req.bridge, req.fade_outro, req.fade_bars, req.intro)
-    saved = [(s["label"], s["start_bar"], s["bars"]) for s in data.get("sections", [])]
-    if saved and saved != [(s.label, s.start_bar, s.bars) for s in arr.sections]:
-        raise ValueError("De structuur van dit nummer kon niet worden teruggevonden (gemaakt met een oudere versie). "
-                         "Gebruik ‘Instellingen overnemen’ en genereer het nummer opnieuw.")
-    return req, arr
-
-
-def _clear_solos(folder: Path) -> None:
-    for p in list(folder.glob(SOLO_PREFIX + "*")) + list(folder.glob(SOLO_MIX + ".*")) + list(folder.glob(".*.zip")):
-        p.unlink(missing_ok=True)
-
-
-def _load_stems(folder: Path) -> list[np.ndarray]:
-    stems = []
-    for meta in lib.INSTRUMENTS:
-        for ext in (".wav", ".aiff"):
-            p = folder / f"{meta['number']:02d}_{meta['file']}{ext}"
-            if p.exists():
-                stems.append(renderer.load(p))
-                break
-    return stems
-
-
-def _finish_session(folder: Path, data: dict) -> dict:
-    data["files"] = storage.list_files(folder)
-    storage.save_session_json(folder, data)
+    generate_session(req, folder=folder, keep={"created": data.get("created")})
     return storage.load_session(folder.name)
-
-
-def remove_solos(session_id: str) -> dict:
-    folder = storage.session_path(session_id)
-    data = storage.load_session(session_id) or {}
-    if data.get("source") != "server":
-        raise ValueError("Dit nummer heeft geen solo's van deze app.")
-    _clear_solos(folder)
-    try:
-        _, arr = _rebuild_arrangement(data)
-        (folder / "Akkoorden.txt").write_text(chord_chart(arr), encoding="utf-8")
-    except ValueError:
-        pass
-    data.pop("solo_warnings", None)
-    data.pop("solos", None)
-    data.pop("solo_settings", None)
-    data.pop("mix_solo_url", None)
-    return _finish_session(folder, data)
-
-
-def add_solos(session_id: str, sreq: SoloRequest) -> dict:
-
-    folder = storage.session_path(session_id)
-    data = storage.load_session(session_id)
-    if not data:
-        raise ValueError("Nummer niet gevonden.")
-    req, arr = _rebuild_arrangement(data)
-    idxs = sorted(set(sreq.sections))
-    if not idxs:
-        raise ValueError("Kies minimaal één deel van het nummer voor een solo.")
-    if any(i < 0 or i >= len(arr.sections) for i in idxs):
-        raise ValueError("Onbekend deel van het nummer gekozen.")
-
-    genre, mood = arr.plan.profile.genre, arr.plan.profile.mood
-    style = auto_style(genre) if sreq.style == "auto" else sreq.style
-    tone = auto_tone(genre, mood) if sreq.tone == "auto" else sreq.tone
-    seed = sreq.seed if sreq.seed is not None else random.randint(1, 999_999)
-
-    _clear_solos(folder)
-    warnings: list[str] = []
-    solos, tracks, names = [], [], []
-    for n, i in enumerate(idxs, start=1):
-        sec = arr.sections[i]
-        tr = solo_track(arr, sec, n, style, tone, seed, req.humanize)
-        name = f"{SOLO_PREFIX}{n}_{storage.camel(sec.label, 20)}"
-        write_stem(tr, arr, folder / f"{name}.mid", with_fade=req.fade_outro)
-        tracks.append(tr)
-        names.append(name)
-        solos.append({"number": n, "section": i, "label": sec.label, "start_bar": sec.start_bar,
-                      "bars": sec.bars, "name": name})
-
-    for tr, name in zip(tracks, names):
-        tr.id = name                       # _render_tracks indexeert op id
-    rendered = _render_tracks(tracks, arr, folder / ".render_solo", req.fade_outro, warnings)
-    audio_by_name = {name: rendered[name] for name in names if name in rendered}
-    for name, audio in audio_by_name.items():
-        if "wav" in req.formats or "aiff" not in req.formats:
-            renderer.write(audio, folder / f"{name}.wav", "WAV")
-        if "aiff" in req.formats:
-            renderer.write(audio, folder / f"{name}.aiff", "AIFF")
-
-    mix_solo_url = None
-    stems = _load_stems(folder) if audio_by_name else []
-    if stems:
-        n = len(stems[0])
-        backing = sum(renderer.fit_length(s, n) for s in stems)
-        lead = sum(renderer.fit_length(a, n) for a in audio_by_name.values())
-        mix = renderer.normalize(backing + lead * 1.1)
-        renderer.write(mix, folder / f"{SOLO_MIX}.wav", "WAV", "PCM_16")
-        if renderer.to_m4a(find_afconvert(), folder / f"{SOLO_MIX}.wav", folder / f"{SOLO_MIX}.m4a"):
-            mix_solo_url = f"/api/sessions/{storage._url_id(folder.name)}/files/{SOLO_MIX}.m4a"
-        else:
-            mix_solo_url = f"/api/sessions/{storage._url_id(folder.name)}/files/{SOLO_MIX}.wav"
-
-    tone_label = TONES[tone][1]
-    data["solos"] = solos
-    data["solo_settings"] = {"style": style, "tone": tone, "tone_label": tone_label, "seed": seed,
-                             "sections": idxs}
-    data["mix_solo_url"] = mix_solo_url
-    data["solo_warnings"] = warnings
-    (folder / "Akkoorden.txt").write_text(chord_chart(arr) + _solo_chart(solos, style, tone_label), encoding="utf-8")
-    return _finish_session(folder, data)
-
-
-def _solo_chart(solos: list[dict], style: str, tone_label: str) -> str:
-    lines = ["", f"Gitaarsolo's ({style}, {tone_label}) – elk bestand begint op maat 1:"]
-    for s in solos:
-        lines.append(f"  Solo {s['number']}: {s['label']}, maat {s['start_bar'] + 1}-{s['start_bar'] + s['bars']}"
-                     f"  ->  {s['name']}.wav / .mid")
-    return "\n".join(lines) + "\n"

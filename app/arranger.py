@@ -31,6 +31,9 @@ class Section:
     chords: list[TimedChord] = field(default_factory=list)
     final_hit: bool = False   # strak slotakkoord in de laatste maat
     fade: bool = False
+    base_index: Optional[int] = None   # positie in de basisstructuur; None = ingevoegde gitaarsolo
+    solo_no: Optional[int] = None
+    solo_spec: Optional[object] = None
 
     @property
     def start_beat(self) -> float:
@@ -208,7 +211,7 @@ def _fill(events: list[ChordEvent], start_beat: float, beats: float) -> list[Tim
 
 
 def build_arrangement(plan: Plan, duration_seconds: int, bridge: bool, fade: bool, fade_bars: int,
-                      intro_on: bool = True) -> Arrangement:
+                      intro_on: bool = True, solos: Optional[list] = None) -> Arrangement:
     total = total_bars_for(duration_seconds, plan.bpm)
     u = _unit(plan.verse)
     intro = (4 if total < 40 else 8) if intro_on else 0   # zonder intro: direct het couplet
@@ -265,7 +268,7 @@ def build_arrangement(plan: Plan, duration_seconds: int, bridge: bool, fade: boo
             e = 1.0 if last and n_chorus > 1 else 0.75 + 0.1 * min(counts["chorus"] - 1, 1)
             sections.append(Section(kind, f"Refrein {counts['chorus']}", bar, bars, e, e))
         elif kind == "solo":
-            sections.append(Section(kind, "Solo", bar, bars, 0.78, 0.85))
+            sections.append(Section(kind, "Instrumentaal", bar, bars, 0.78, 0.85))
         elif kind == "interlude":
             sections.append(Section(kind, "Tussenspel", bar, bars, 0.5, 0.55))
         elif kind == "bridge":
@@ -274,9 +277,35 @@ def build_arrangement(plan: Plan, duration_seconds: int, bridge: bool, fade: boo
     sections.append(Section("outro", "Outro", bar, outro, 0.72 if fade else 0.6, 0.72 if fade else 0.45,
                             final_hit=not fade, fade=fade))
     bar += outro
+    for i, s in enumerate(sections):
+        s.base_index = i
+
+    # Gitaarsolo's als nieuwe delen invoegen (na het gekozen deel; nooit na de outro)
+    if solos:
+        last_allowed = len(sections) - 2
+        for spec in solos:
+            if spec.after > last_allowed:
+                raise ValueError("Een solo kan niet na de outro komen; kies ‘voor de Outro’.")
+        out: list[Section] = []
+        n = 0
+        for s in sections:
+            out.append(s)
+            for spec in [x for x in solos if x.after == s.base_index]:
+                n += 1
+                solo = Section("solo", f"Gitaarsolo {n}", 0, spec.bars, 0.8, 0.92)
+                solo.solo_no, solo.solo_spec = n, spec
+                out.append(solo)
+        sections = out
+        bar = 0
+        for s in sections:
+            s.start_bar = bar
+            bar += s.bars
+        total = bar
 
     for s in sections:
-        if s.kind in ("chorus",):
+        if s.solo_spec is not None:
+            prog = {"chorus": plan.chorus, "bridge": plan.bridge}.get(s.solo_spec.chords, plan.verse)
+        elif s.kind in ("chorus",):
             prog = plan.chorus
         elif s.kind == "bridge":
             prog = plan.bridge

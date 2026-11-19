@@ -50,6 +50,20 @@ class Instruments(BaseModel):
     pad: bool = True
 
 
+class SoloSpec(BaseModel):
+    """Eén gitaarsolo als nieuw deel, ingevoegd ná een deel van de basisstructuur."""
+    after: int = Field(ge=0)                       # index in de basisstructuur (zonder ingevoegde solo's)
+    bars: int = Field(8, ge=2, le=32)
+    style: Literal["auto", "melodisch", "bluesy", "virtuoos"] = "auto"
+    tone: Literal["auto", "overdrive", "distortion", "clean", "jazz"] = "auto"
+    chords: Literal["verse", "chorus", "bridge"] = "verse"   # over welke akkoorden de solo gaat
+
+
+class SoloRequest(BaseModel):
+    solos: list[SoloSpec] = Field(default_factory=list, max_length=8)
+    seed: Optional[int] = None                     # leeg = elke keer een nieuwe variant
+
+
 class GenerateRequest(BaseModel):
     reference: Optional[str] = None
     profile: Optional[MusicProfile] = None
@@ -70,14 +84,8 @@ class GenerateRequest(BaseModel):
     formats: list[Literal["wav", "aiff"]] = Field(default_factory=lambda: ["wav"])
     seed: Optional[int] = None
     humanize: bool = True
-
-
-class SoloRequest(BaseModel):
-    """Gitaarsolo's toevoegen aan een bestaand nummer. Elke gekozen sectie = één solo (eigen WAV/MIDI)."""
-    sections: list[int] = Field(default_factory=list, max_length=12)   # indexen in session.sections
-    style: Literal["auto", "melodisch", "bluesy", "virtuoos"] = "auto"
-    tone: Literal["auto", "overdrive", "distortion", "clean", "jazz"] = "auto"
-    seed: Optional[int] = None
+    solos: list[SoloSpec] = Field(default_factory=list, max_length=8)   # ingevoegde gitaarsolo's
+    solo_seed: Optional[int] = None
 
 
 class SectionInfo(BaseModel):
@@ -87,6 +95,8 @@ class SectionInfo(BaseModel):
     bars: int
     energy: float
     chords: list[str]
+    base_index: Optional[int] = None    # positie in de basisstructuur (None = ingevoegde solo)
+    solo: Optional[int] = None          # solonummer bij een ingevoegde gitaarsolo
 
 
 class FileInfo(BaseModel):
@@ -120,6 +130,8 @@ class SessionResult(BaseModel):
     audio_rendered: bool
     warnings: list[str] = Field(default_factory=list)
     profile: MusicProfile
+    solos: list[dict] = Field(default_factory=list)
+    mix_solo_url: Optional[str] = None
 
 
 class PreviewResult(BaseModel):

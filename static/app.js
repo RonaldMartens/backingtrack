@@ -159,8 +159,9 @@ function bindEvents() {
   $("btnReveal").addEventListener("click", revealSession);
   $("btnStop").addEventListener("click", stopServer);
   $("btnChords").addEventListener("click", openChords);
-  $("btnSolos").addEventListener("click", makeSolos);
-  $("btnRemoveSolos").addEventListener("click", removeSolos);
+  $("btnSolos").addEventListener("click", () => makeSolos(false));
+  $("btnRemoveSolos").addEventListener("click", () => makeSolos(true));
+  $("btnAddSolo").addEventListener("click", addSoloRow);
   $("mixWithSolo").addEventListener("click", () => playMix(true));
   $("mixNoSolo").addEventListener("click", () => playMix(false));
   $("btnCloseChords").addEventListener("click", closeChords);
@@ -442,70 +443,112 @@ function playMix(withSolo, autoplay = true) {
   $("mixNoSolo").className = "px-2.5 py-1 " + (!withSolo ? "bg-amber-500 text-black" : "bg-slate-800 hover:bg-slate-700");
 }
 
+const SOLO_STYLES = [["auto", "Stijl: auto"], ["melodisch", "Melodisch"], ["bluesy", "Bluesy (bends)"], ["virtuoos", "Virtuoos (snel)"]];
+const SOLO_TONES = [["auto", "Klank: auto"], ["overdrive", "Overdrive"], ["distortion", "Distortion"], ["clean", "Clean"], ["jazz", "Jazzgitaar"]];
+const SOLO_CHORDS = [["verse", "Over couplet"], ["chorus", "Over refrein"], ["bridge", "Over bridge"]];
+const SOLO_BARS = [2, 4, 8, 12, 16, 24, 32];
+
+// Basisstructuur = het nummer zonder ingevoegde solo's (daar verwijzen de plaatsen naar)
+function baseSections(r) {
+  let i = 0;
+  return (r.sections || []).filter((s) => !s.solo).map((s) => ({ ...s, base_index: s.base_index ?? i++ }));
+}
+
 function renderSoloBox(r) {
   const canSolo = !!r.request;
   $("soloForm").classList.toggle("hidden", !canSolo);
   $("soloUnavailable").classList.toggle("hidden", canSolo);
   $("soloStatus").textContent = "";
   const solos = r.solos || [];
-  const st = r.solo_settings || {};
-  $("soloInfo").textContent = solos.length
-    ? `${solos.length} solo${solos.length > 1 ? "'s" : ""} · ${st.style || ""} · ${st.tone_label || ""}` : "";
-  $("btnSolos").textContent = solos.length ? "🎸 Nieuwe solo's maken" : "🎸 Solo's toevoegen";
+  $("soloInfo").textContent = solos.length ? `${solos.length} solo${solos.length > 1 ? "'s" : ""} in het nummer` : "";
   $("btnRemoveSolos").classList.toggle("hidden", !solos.length);
-  if (st.style) $("soloStyle").value = solos.length ? st.style : "auto";
-  if (st.tone) $("soloTone").value = solos.length ? st.tone : "auto";
-  const box = $("soloSections");
-  box.innerHTML = "";
-  if (!canSolo) return;
-  const chosen = new Set(solos.length ? solos.map((x) => x.section)
-    : r.sections.map((s, i) => (s.name === "solo" ? i : -1)).filter((i) => i >= 0));
-  r.sections.forEach((s, i) => {
-    const cb = el("input", { type: "checkbox", value: String(i) });
-    cb.checked = chosen.has(i);
-    box.append(el("label", { class: "chip", title: `maat ${s.start_bar + 1}–${s.start_bar + s.bars}` },
-      cb, el("span", { text: `${s.label} · ${s.bars}m` })));
-  });
-  (r.solo_warnings || []).forEach((t) => ($("soloStatus").textContent += t + " "));
+  $("btnSolos").textContent = solos.length ? "🎸 Solo's opnieuw maken" : "🎸 Solo's maken";
+  const req = (r.request && r.request.solos) || [];
+  state.soloRows = solos.map((x, k) => ({
+    after: x.after, bars: x.bars, chords: x.chords || "verse",
+    style: (req[k] && req[k].style) || x.style || "auto", tone: (req[k] && req[k].tone) || x.tone || "auto",
+  }));
+  renderSoloRows();
 }
 
-async function makeSolos() {
+function defaultSoloRow() {
+  const base = baseSections(state.lastResult);
+  const preOutro = base.length >= 2 ? base[base.length - 2].base_index : 0;
+  const used = new Set(state.soloRows.map((x) => x.after));
+  // eerste suggestie: vóór de outro; daarna na een refrein dat nog vrij is
+  const chorus = base.filter((s) => s.name === "chorus" && !used.has(s.base_index) && s.base_index < preOutro);
+  const after = !used.has(preOutro) ? preOutro : (chorus.length ? chorus[chorus.length - 1].base_index : preOutro);
+  const twelve = base.some((s) => s.bars === 12);
+  return { after, bars: twelve ? 12 : 8, chords: "verse", style: "auto", tone: "auto" };
+}
+
+function addSoloRow() {
+  if (state.soloRows.length >= 8) return;
+  state.soloRows.push(defaultSoloRow());
+  renderSoloRows();
+}
+
+function sel(options, value, onChange, cls = "") {
+  const s = el("select", { class: "inp " + cls });
+  options.forEach(([v, t]) => s.append(option(String(v), t)));
+  s.value = String(value);
+  s.addEventListener("change", () => onChange(s.value));
+  return s;
+}
+
+function renderSoloRows() {
+  const box = $("soloRows"), r = state.lastResult;
+  box.innerHTML = "";
+  if (!r || !r.request) return;
+  const base = baseSections(r);
+  const places = base.slice(0, -1).map((s, k, arr) =>
+    [s.base_index, k === arr.length - 1 ? `Vóór de outro (na ${s.label})` : `Na ${s.label}`]);
+  if (!state.soloRows.length) {
+    box.append(el("p", { class: "text-xs text-slate-500", text: "Nog geen solo's. Klik op ‘＋ Solo toevoegen’." }));
+    return;
+  }
+  // nummering volgt de volgorde in het nummer
+  const order = state.soloRows.map((x, k) => [x.after, k]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[1]);
+  order.forEach((k, n) => {
+    const row = state.soloRows[k];
+    const del = el("button", { class: "w-7 h-7 rounded-lg bg-slate-800 hover:bg-red-500/80 text-slate-300 flex-none", title: "Deze solo weghalen", text: "✕" });
+    del.addEventListener("click", () => { state.soloRows.splice(k, 1); renderSoloRows(); });
+    box.append(el("div", { class: "solo-row rounded-lg bg-slate-900/60 border border-slate-800 p-2.5" },
+      el("div", { class: "flex items-center justify-between gap-2 mb-2" },
+        el("span", { class: "text-sm font-semibold text-pink-300", text: `🎸 Gitaarsolo ${n + 1}` }), del),
+      el("div", { class: "grid grid-cols-2 sm:grid-cols-3 gap-2" },
+        sel(places, row.after, (v) => { row.after = Number(v); renderSoloRows(); }, "col-span-2 sm:col-span-2"),
+        sel(SOLO_BARS.map((b) => [b, `${b} maten`]), row.bars, (v) => (row.bars = Number(v))),
+        sel(SOLO_STYLES, row.style, (v) => (row.style = v)),
+        sel(SOLO_TONES, row.tone, (v) => (row.tone = v)),
+        sel(SOLO_CHORDS, row.chords, (v) => (row.chords = v)))));
+  });
+}
+
+async function makeSolos(removeAll) {
   const r = state.lastResult;
   if (!r || state.busy) return;
-  const sections = [...$("soloSections").querySelectorAll("input:checked")].map((c) => Number(c.value));
-  if (!sections.length) { $("soloStatus").textContent = "Vink eerst minimaal één deel aan waar de solo moet komen."; return; }
+  if (removeAll && !confirm("Alle solo's uit dit nummer halen? Het nummer krijgt weer de oorspronkelijke lengte.")) return;
+  const solos = removeAll ? [] : state.soloRows;
+  if (!removeAll && !solos.length) { $("soloStatus").textContent = "Voeg eerst een solo toe met ‘＋ Solo toevoegen’."; return; }
   setBusy(true);
-  $("btnSolos").disabled = true;
+  ["btnSolos", "btnAddSolo", "btnRemoveSolos"].forEach((id) => ($(id).disabled = true));
   $("soloStatus").innerHTML = "";
   $("soloStatus").append(el("span", { class: "spin mr-2 align-middle" }),
-    document.createTextNode(`Gitaarsolo${sections.length > 1 ? "'s" : ""} maken en renderen…`));
+    document.createTextNode(removeAll ? "Nummer zonder solo's opnieuw opbouwen…" : "Nummer met solo's opnieuw opbouwen en renderen…"));
   try {
-    const res = await api(`/api/sessions/${encodeURIComponent(r.id)}/solos`, {
-      sections, style: $("soloStyle").value, tone: $("soloTone").value,
-    });
+    const res = await api(`/api/sessions/${encodeURIComponent(r.id)}/solos`, { solos });
     state.keepScroll = true;
     showResult(res);
-    $("soloStatus").textContent = res.mix_solo_url
-      ? "Klaar! Luister met ‘Met solo’, of klik nog een keer voor een nieuwe variant."
+    loadSessions();
+    $("soloStatus").textContent = removeAll ? "Solo's weggehaald."
+      : res.mix_solo_url ? `Klaar! Het nummer duurt nu ${fmtTime(res.duration_seconds)}. Klik nog een keer voor nieuwe varianten.`
       : "Solo-MIDI gemaakt (geen audio: FluidSynth/SoundFont niet gevonden).";
   } catch (e) {
-    $("soloStatus").textContent = "Solo maken mislukt: " + e.message;
+    $("soloStatus").textContent = "Solo's maken mislukt: " + e.message;
   } finally {
     setBusy(false);
-    $("btnSolos").disabled = false;
-  }
-}
-
-async function removeSolos() {
-  const r = state.lastResult;
-  if (!r || state.busy || !confirm("Alle solo's van dit nummer verwijderen?")) return;
-  try {
-    const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(r.id)}/solos`, { method: "DELETE" });
-    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
-    state.keepScroll = true;
-    showResult(await res.json());
-  } catch (e) {
-    $("soloStatus").textContent = "Verwijderen mislukt: " + e.message;
+    ["btnSolos", "btnAddSolo", "btnRemoveSolos"].forEach((id) => ($(id).disabled = false));
   }
 }
 

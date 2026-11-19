@@ -19,7 +19,7 @@ from . import lifecycle, storage
 from .analyzer import analyze_reference
 from .guitar import chord_sheet
 from .config import OUTPUT_DIR, PREVIEW_DIR, STATIC_DIR, find_afconvert, find_fluidsynth, find_soundfont
-from .engine import add_solos, generate_preview, generate_session, remove_solos
+from .engine import generate_preview, generate_session, set_solos
 from pydantic import BaseModel, Field
 
 from .models import AnalyzeRequest, AnalyzeResponse, GenerateRequest, PreviewResult, SessionResult, SoloRequest
@@ -207,20 +207,11 @@ def session_file(session_id: str, filename: str) -> FileResponse:
 
 @app.post("/api/sessions/{session_id}/solos")
 def session_solos(session_id: str, req: SoloRequest) -> dict:
-    """Gitaarsolo's toevoegen (of opnieuw maken) over de gekozen delen van een bestaand nummer."""
+    """Gitaarsolo's instellen: het nummer wordt in dezelfde map opnieuw opgebouwd met de solodelen ingevoegd.
+    Een lege lijst haalt alle solo's weer weg."""
     try:
         with lifecycle.busy():
-            return add_solos(session_id, req)
-    except FileNotFoundError:
-        raise HTTPException(404, "Sessie niet gevonden")
-    except ValueError as e:
-        raise HTTPException(400, str(e))
-
-
-@app.delete("/api/sessions/{session_id}/solos")
-def session_solos_delete(session_id: str) -> dict:
-    try:
-        return remove_solos(session_id)
+            return set_solos(session_id, req)
     except FileNotFoundError:
         raise HTTPException(404, "Sessie niet gevonden")
     except ValueError as e:

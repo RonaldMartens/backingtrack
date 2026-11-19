@@ -35,6 +35,7 @@
     .sec-intro { background: #475569; } .sec-verse { background: #2563eb; } .sec-chorus { background: #f59e0b; }
     .sec-bridge { background: #a855f7; } .sec-solo { background: #ec4899; } .sec-interlude { background: #0d9488; }
     .sec-outro { background: #64748b; }
+    .solo-row select { padding-top: .45rem; padding-bottom: .45rem; font-size: .85rem; }
     .chord-dia { color: #cbd5e1; }
     .chordrow { break-inside: avoid; page-break-inside: avoid; }
     @media print {
@@ -243,33 +244,14 @@
             <span id="soloInfo" class="text-xs text-pink-300 text-right"></span>
           </div>
           <div id="soloForm">
-            <p class="text-xs text-slate-400 mt-1">Kies waar in het nummer een solo moet komen. Elk gekozen deel wordt een eigen solo
-              met een <b>aparte WAV en MIDI</b>. Elk bestand begint op maat 1: zet het in Logic gewoon op maat 1.</p>
-            <div id="soloSections" class="flex flex-wrap gap-1.5 mt-3"></div>
-            <div class="grid grid-cols-2 gap-3 mt-3">
-              <div>
-                <label class="lbl" for="soloStyle">Speelstijl</label>
-                <select id="soloStyle" class="inp">
-                  <option value="auto">Automatisch (past bij genre)</option>
-                  <option value="melodisch">Melodisch – zingend, ruimte</option>
-                  <option value="bluesy">Bluesy – bends &amp; vibrato</option>
-                  <option value="virtuoos">Virtuoos – snelle loopjes</option>
-                </select>
-              </div>
-              <div>
-                <label class="lbl" for="soloTone">Gitaarklank</label>
-                <select id="soloTone" class="inp">
-                  <option value="auto">Automatisch</option>
-                  <option value="overdrive">Overdrive</option>
-                  <option value="distortion">Distortion</option>
-                  <option value="clean">Clean</option>
-                  <option value="jazz">Jazzgitaar</option>
-                </select>
-              </div>
-            </div>
+            <p class="text-xs text-slate-400 mt-1">Een solo komt als <b>nieuw deel</b> in het nummer, bijvoorbeeld na Refrein 2 of
+              vóór de Outro. De begeleiding speelt eronder door en het nummer wordt zoveel maten langer. De rest blijft gelijk.
+              Elke solo wordt een <b>aparte WAV en MIDI</b> die op maat 1 begint: zet hem in Logic gewoon op maat 1.</p>
+            <div id="soloRows" class="grid gap-2 mt-3"></div>
             <div class="flex flex-wrap gap-2 mt-3">
-              <button id="btnSolos" class="btn bg-pink-500 hover:bg-pink-400 text-black text-sm">🎸 Solo's toevoegen</button>
-              <button id="btnRemoveSolos" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm hidden">Solo's verwijderen</button>
+              <button id="btnAddSolo" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm">＋ Solo toevoegen</button>
+              <button id="btnSolos" class="btn bg-pink-500 hover:bg-pink-400 text-black text-sm">🎸 Solo's maken</button>
+              <button id="btnRemoveSolos" class="btn bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm hidden">Alle solo's weghalen</button>
             </div>
             <div id="soloStatus" class="text-xs text-slate-400 mt-2 min-h-[1rem]"></div>
           </div>
