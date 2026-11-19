@@ -73,9 +73,17 @@ function fmtTime(sec) {
 }
 
 // ------------------------------------------------------------------ opties
+// Referentieveld bij het opstarten altijd leeg (de browser vult anders het laatst getypte nummer weer in)
+function clearReferenceOnStart() {
+  $("reference").value = "";
+}
+window.addEventListener("pageshow", (e) => { if (e.persisted) { clearReferenceOnStart(); if (state.profile) clearProfile(false); } });
+
 async function init() {
+  clearReferenceOnStart();
   const opts = await api("/api/options");
   state.options = opts;
+  clearReferenceOnStart();   // ook na een late formulier-herstel door de browser
 
   opts.references.forEach((r) => $("refList").append(el("option", { value: r })));
   opts.moods.forEach((m) => $("mood").append(option(m.value, m.label)));
