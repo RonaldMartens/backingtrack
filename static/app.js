@@ -157,6 +157,7 @@ function bindEvents() {
   $("sessionSearch").addEventListener("input", renderSessions);
   $("btnRestore").addEventListener("click", () => restoreSettings(state.lastResult));
   $("btnReveal").addEventListener("click", revealSession);
+  $("btnDelete").addEventListener("click", deleteSession);
   $("btnStop").addEventListener("click", stopServer);
   $("btnChords").addEventListener("click", openChords);
   $("btnSolos").addEventListener("click", () => makeSolos(false));
@@ -549,6 +550,26 @@ async function makeSolos(removeAll) {
   } finally {
     setBusy(false);
     ["btnSolos", "btnAddSolo", "btnRemoveSolos"].forEach((id) => ($(id).disabled = false));
+  }
+}
+
+async function deleteSession() {
+  const r = state.lastResult;
+  if (!r || state.busy) return;
+  const name = r.title && r.title !== r.id ? `“${r.title}” (${r.id})` : `“${r.id}”`;
+  if (!confirm(`Nummer ${name} verwijderen?\n\nDe hele map met alle audio-, MIDI- en tekstbestanden gaat naar de Prullenmand.`)) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(r.id)}`, { method: "DELETE" });
+    if (!res.ok) { let m = res.statusText; try { m = (await res.json()).detail || m; } catch (_) {} throw new Error(m); }
+    const out = await res.json();
+    const audio = $("mixAudio"); audio.pause(); audio.removeAttribute("src");
+    state.lastResult = null; state.shownId = null;
+    $("result").classList.add("hidden");
+    setStatus(out.trash ? `Verwijderd: ${r.id} staat in de Prullenmand (terug te zetten zolang je die niet leegt).`
+                        : `Verwijderd: ${r.id} is definitief gewist.`);
+    loadSessions();
+  } catch (e) {
+    setStatus("Verwijderen mislukt: " + e.message, "error");
   }
 }
 

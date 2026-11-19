@@ -184,3 +184,7 @@ Per solo krijg je een aparte `06_Solo_<n>_na<Deel>.wav` en `.mid`:
 Let op: de begeleiding wordt opnieuw gerenderd, dus heb je de stems al in Logic staan, importeer ze dan opnieuw.
 
 Solo's toevoegen kan alleen bij nummers die met deze app zijn gemaakt, niet bij tracks uit de online HTML-app.
+
+## Een nummer verwijderen
+
+Open het nummer (na het genereren, of via **Mijn nummers**) en klik **🗑 Verwijderen**. Na bevestiging gaat de hele map, met alle audio-, MIDI- en tekstbestanden, naar de **Prullenmand**. Staat het nummer op de externe schijf, dan gaat het naar de prullenmand van die schijf. Zolang je de prullenmand niet leegt, kun je het nummer terugzetten via Finder (*Zet terug*). Als het niet naar de prullenmand kan, wordt de map definitief verwijderd; de melding zegt dan welke van de twee er gebeurd is.

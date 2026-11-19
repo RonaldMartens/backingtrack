@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import re
 import unicodedata
 import zipfile
@@ -260,3 +262,29 @@ def cleanup_previews(keep: int = 6) -> None:
             p.unlink()
         except OSError:
             pass
+
+
+def _trash_dir(path: Path) -> Path:
+    """Prullenmand van het volume waar de map op staat (externe schijf: /Volumes/X/.Trashes/<uid>)."""
+    parts = path.resolve().parts
+    if len(parts) > 2 and parts[1] == "Volumes":
+        return Path("/", "Volumes", parts[2], ".Trashes", str(os.getuid()))
+    return Path.home() / ".Trash"
+
+
+def delete_session(session_id: str) -> dict:
+    """Verwijdert een nummer (map + alle bestanden). Eerst naar de Prullenmand; lukt dat niet, dan definitief."""
+    folder = session_path(session_id)              # controleert dat de map echt in de tracksmap ligt
+    if folder.resolve() == OUTPUT_DIR.resolve():
+        raise FileNotFoundError("Ongeldige sessie")
+    try:
+        trash = _trash_dir(folder)
+        trash.mkdir(parents=True, exist_ok=True)
+        target = trash / folder.name
+        if target.exists():
+            target = trash / f"{folder.name} {datetime.now().strftime('%H.%M.%S')}"
+        os.rename(folder, target)                  # zelfde volume: direct, zonder kopiëren
+        return {"deleted": session_id, "trash": True}
+    except OSError:
+        shutil.rmtree(folder)
+        return {"deleted": session_id, "trash": False}

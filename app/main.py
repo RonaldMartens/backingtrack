@@ -181,6 +181,16 @@ def session(session_id: str) -> dict:
     return data
 
 
+@app.delete("/api/sessions/{session_id}")
+def session_delete(session_id: str) -> dict:
+    """Een nummer verwijderen: de hele map gaat naar de Prullenmand (of wordt definitief verwijderd)."""
+    try:
+        with lifecycle.busy():
+            return storage.delete_session(session_id)
+    except FileNotFoundError:
+        raise HTTPException(404, "Sessie niet gevonden")
+
+
 @app.post("/api/sessions/{session_id}/reveal")
 def session_reveal(session_id: str, request: Request) -> dict:
     """Toon de map van het nummer in Finder (alleen vanaf de Mac zelf)."""
