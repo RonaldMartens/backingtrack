@@ -8,8 +8,11 @@ from pathlib import Path
 PROJECT_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = PROJECT_DIR / "static"
 
-# Uitvoermap voor alle sessies (overschrijfbaar via env var)
-OUTPUT_DIR = Path(os.environ.get("BACKINGTRACK_OUTPUT", str(Path.home() / "BackingTrack"))).expanduser()
+# Uitvoermap voor alle sessies (overschrijfbaar via env var). Standaard ~/Music/BackingTrack, net als de HTML-app.
+OUTPUT_DIR = Path(os.environ.get("BACKINGTRACK_OUTPUT", str(Path.home() / "Music" / "BackingTrack"))).expanduser()
+# Nooit tracks in de programmamap zelf (bv. als de code in ~/BackingTrack staat)
+if OUTPUT_DIR.resolve() == PROJECT_DIR or PROJECT_DIR in OUTPUT_DIR.resolve().parents:
+    OUTPUT_DIR = Path.home() / "Music" / "BackingTrack"
 PREVIEW_DIR = OUTPUT_DIR / ".previews"
 
 TICKS_PER_BEAT = 480

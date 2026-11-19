@@ -36,6 +36,6 @@ if [ ! -s "$SF_FILE" ]; then
 fi
 ls -lh "$SF_FILE"
 
-mkdir -p "$HOME/BackingTrack"
+mkdir -p "$HOME/Music/BackingTrack"
 echo
 echo "Klaar! Start de app met:  ./start.sh"

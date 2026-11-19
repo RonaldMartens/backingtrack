@@ -22,3 +22,6 @@ soundfonts/*.sf3
 *.mid
 BackingTrack Tracks/
 *_*BPM_*m*/
+
+# FastAPI-previews
+.previews/

@@ -55,7 +55,7 @@ BackingTrack/
 │   ├── generators.py     # drums, bas, keys, gitaar, pad
 │   ├── midi_writer.py    # MIDI (Type 0 per stem, Type 1 compleet), markers, CC7/CC11
 │   ├── renderer.py       # FluidSynth, fade, mix, WAV/AIFF/M4A
-│   ├── storage.py        # sessiemappen in ~/BackingTrack, ZIP
+│   ├── storage.py        # sessiemappen in ~/Music/BackingTrack, ZIP
 │   └── engine.py         # alles aan elkaar: generate / preview
 ├── static/
 │   ├── index.html        # webinterface (Tailwind, responsive)
@@ -65,7 +65,10 @@ BackingTrack/
 
 ## 4. Uitvoer
 
-Elke sessie komt in een eigen map, bijvoorbeeld `~/BackingTrack/RockBallad_Am_EmptyRooms_70BPM_5m/`:
+Elke sessie komt in een eigen map, bijvoorbeeld `~/Music/BackingTrack/RockBallad_Am_EmptyRooms_70BPM_5m/`.
+Andere plek, bijv. je externe schijf: start met `BACKINGTRACK_OUTPUT="/Volumes/Externe_schijf/BackingTrack Tracks" ./start.sh`.
+
+Inhoud van een sessiemap:
 
 ```
 00_Arrangement.mid   alle sporen + tempo + sectiemarkers (Type 1)
