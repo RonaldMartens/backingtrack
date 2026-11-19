@@ -35,6 +35,20 @@
     .sec-intro { background: #475569; } .sec-verse { background: #2563eb; } .sec-chorus { background: #f59e0b; }
     .sec-bridge { background: #a855f7; } .sec-solo { background: #ec4899; } .sec-interlude { background: #0d9488; }
     .sec-outro { background: #64748b; }
+    .chord-dia { color: #cbd5e1; }
+    .chordrow { break-inside: avoid; page-break-inside: avoid; }
+    @media print {
+      body { background: #fff !important; }
+      body > *:not(#chordModal) { display: none !important; }
+      #chordModal { position: static !important; display: block !important; background: #fff !important; overflow: visible !important; }
+      #chordModal .chordsheet { background: #fff !important; border: 0 !important; color: #000 !important; max-width: none; margin: 0; padding: 0; }
+      #chordModal .text-slate-400, #chordModal .text-slate-300, #chordModal .text-slate-500 { color: #333 !important; }
+      #chordModal .text-slate-200 { color: #000 !important; }
+      #chordModal .text-amber-300 { color: #b45309 !important; }
+      #chordModal .border-slate-800 { border-color: #ccc !important; }
+      .chord-dia { color: #111 !important; }
+      .noprint { display: none !important; }
+    }
   </style>
 </head>
 <body class="min-h-full text-slate-200 antialiased">
@@ -195,7 +209,10 @@
             <h2 id="resTitle" class="font-semibold text-lg truncate"></h2>
             <p id="resMeta" class="text-sm text-slate-400"></p>
           </div>
-          <a id="resZip" class="btn bg-amber-500 hover:bg-amber-400 text-black text-sm whitespace-nowrap" href="#">⬇︎ ZIP</a>
+          <div class="flex gap-2 flex-none">
+            <button id="btnChords" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm whitespace-nowrap">🎸 Gitaarakkoorden</button>
+            <a id="resZip" class="btn bg-amber-500 hover:bg-amber-400 text-black text-sm whitespace-nowrap" href="#">⬇︎ ZIP</a>
+          </div>
         </div>
         <audio id="mixAudio" controls class="w-full mt-4"></audio>
         <div id="resWarnings" class="mt-3 space-y-1"></div>
@@ -216,6 +233,25 @@
       </div>
     </section>
   </main>
+
+  <!-- Gitaarakkoorden-overzicht -->
+  <div id="chordModal" class="hidden fixed inset-0 z-50 bg-black/75 overflow-y-auto">
+    <div class="chordsheet card max-w-5xl mx-auto my-4 sm:my-8 p-4 sm:p-6">
+      <div class="flex items-start justify-between gap-3 mb-1">
+        <div class="min-w-0">
+          <h2 class="text-lg font-semibold">🎸 Gitaarakkoorden</h2>
+          <p id="chordTitle" class="text-sm text-slate-400 truncate"></p>
+        </div>
+        <div class="flex gap-2 noprint flex-none">
+          <button id="btnPrintChords" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm">🖨 Afdrukken</button>
+          <button id="btnCloseChords" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm" title="Sluiten (Esc)">✕</button>
+        </div>
+      </div>
+      <div id="chordSections" class="text-sm mt-3 grid gap-1"></div>
+      <p class="text-xs text-slate-500 mt-3 noprint">Standaardstemming E A D G B E · per akkoord 4 posities op de hals · cijfers = vingers (1 wijsvinger … 4 pink) · x = niet aanslaan, o = open snaar</p>
+      <div id="chordGrid" class="mt-4 grid gap-5"></div>
+    </div>
+  </div>
 
   <script src="/app.js"></script>
 </body>

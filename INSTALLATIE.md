@@ -54,6 +54,14 @@ Maak eenmalig een icoon op je bureaublad:
 - Het logbestand staat in `~/Library/Logs/BackingTrack.log`.
 - Tip: sleep het icoon ook naar je Dock.
 
+### Gitaarakkoorden
+
+Bij elke track zit een knop **🎸 Gitaarakkoorden**. Die opent een overzicht met:
+- de akkoordvolgorde per sectie;
+- voor elk akkoord **4 grepen op verschillende posities** (standaardstemming), met vingerzetting, barré, x/o en tab.
+
+Met **Afdrukken** krijg je een nette A4. De grepen worden berekend (`app/guitar.py`), dus ook kleurakkoorden als `Am(add9)`, `Bm7b5` of `G/B` krijgen speelbare grepen. API: `POST /api/guitar-chords {"chords": ["Am", "F"], "key": "Am"}`.
+
 ## 3. Projectstructuur
 
 ```
@@ -67,6 +75,7 @@ BackingTrack/
 │   ├── main.py           # FastAPI: routes, CORS, static files
 │   ├── models.py         # Pydantic-requests/responses (API-contract voor iOS)
 │   ├── config.py         # paden, FluidSynth/SoundFont-detectie
+│   ├── guitar.py         # gitaargrepen berekenen (4 posities per akkoord)
 │   ├── theory.py         # toonsoorten (ook Nederlands: Fis, Bes, Esm), akkoorden, trapnummers, voicings
 │   ├── library.py        # genres, sferen, akkoordenschema's, referentienummers
 │   ├── analyzer.py       # referentie → profiel (bibliotheek / Claude API / heuristiek)

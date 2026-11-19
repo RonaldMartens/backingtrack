@@ -16,8 +16,11 @@ from fastapi.staticfiles import StaticFiles
 from . import library as lib
 from . import lifecycle, storage
 from .analyzer import analyze_reference
+from .guitar import chord_sheet
 from .config import OUTPUT_DIR, PREVIEW_DIR, STATIC_DIR, find_afconvert, find_fluidsynth, find_soundfont
 from .engine import generate_preview, generate_session
+from pydantic import BaseModel, Field
+
 from .models import AnalyzeRequest, AnalyzeResponse, GenerateRequest, PreviewResult, SessionResult
 from .theory import key_options
 
@@ -80,6 +83,17 @@ def options() -> dict:
 @app.post("/api/analyze-reference", response_model=AnalyzeResponse)
 def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     return analyze_reference(req.reference, req.api_key, req.use_claude)
+
+
+class GuitarChordsRequest(BaseModel):
+    chords: list[str] = Field(min_length=1, max_length=64)
+    key: str = "C"
+
+
+@app.post("/api/guitar-chords")
+def guitar_chords(req: GuitarChordsRequest) -> dict:
+    """Gitaargrepen (4 posities per akkoord) voor de akkoorden van een track."""
+    return {"chords": chord_sheet([c.strip() for c in req.chords if c.strip()], req.key)}
 
 
 @app.post("/api/generate", response_model=SessionResult)

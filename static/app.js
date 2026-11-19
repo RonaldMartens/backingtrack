@@ -135,6 +135,11 @@ function bindEvents() {
   $("btnPreview").addEventListener("click", preview);
   $("btnRefresh").addEventListener("click", loadSessions);
   $("btnStop").addEventListener("click", stopServer);
+  $("btnChords").addEventListener("click", openChords);
+  $("btnCloseChords").addEventListener("click", closeChords);
+  $("btnPrintChords").addEventListener("click", () => window.print());
+  $("chordModal").addEventListener("click", (e) => { if (e.target.id === "chordModal") closeChords(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChords(); });
   $("rememberKey").addEventListener("change", () => {
     store("bt_api_key", $("rememberKey").checked ? $("apiKey").value.trim() || null : null);
   });
@@ -304,6 +309,7 @@ async function generate() {
 }
 
 function showResult(r) {
+  state.lastResult = r;
   $("result").classList.remove("hidden");
   $("resTitle").textContent = r.title || r.folder;
   const genreLabel = (state.options.genres.find((g) => g.value === r.genre) || {}).label || r.genre;
@@ -407,6 +413,99 @@ async function checkHealth() {
     b.textContent = "Server offline";
     b.className = "text-xs px-2 py-1 rounded-full bg-red-500/15 text-red-300";
   }
+}
+
+// ------------------------------------------------------------------ gitaarakkoorden
+const SVGNS = "http://www.w3.org/2000/svg";
+function svgEl(tag, attrs, text) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+/* Akkoorddiagram: 6 snaren (laag E links), 5 frets, vingernummers, barré, x/o, fretnummer */
+function chordDiagram(v) {
+  const W = 120, H = 158, L = 24, T = 30, SW = 16, FH = 22, FRETS = 5;
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: "chord-dia" });
+  const x = (s) => L + s * SW, y = (f) => T + f * FH;
+  // nut of fretnummer
+  if (v.start_fret === 1) svg.append(svgEl("rect", { x: L - 1, y: T - 4, width: SW * 5 + 2, height: 4, fill: "currentColor" }));
+  else svg.append(svgEl("text", { x: L - 8, y: T + FH / 2 + 4, "text-anchor": "end", "font-size": 10, fill: "currentColor" }, `${v.start_fret}fr`));
+  for (let f = 0; f <= FRETS; f++)
+    svg.append(svgEl("line", { x1: L, x2: L + SW * 5, y1: y(f), y2: y(f), stroke: "currentColor", "stroke-width": 1, opacity: 0.55 }));
+  for (let s = 0; s < 6; s++)
+    svg.append(svgEl("line", { x1: x(s), x2: x(s), y1: T, y2: y(FRETS), stroke: "currentColor", "stroke-width": 1 + (5 - s) * 0.18, opacity: 0.8 }));
+  // x / o boven de hals
+  v.frets.forEach((f, s) => {
+    if (f < 0) svg.append(svgEl("text", { x: x(s), y: T - 9, "text-anchor": "middle", "font-size": 11, fill: "currentColor" }, "×"));
+    else if (f === 0) svg.append(svgEl("circle", { cx: x(s), cy: T - 13, r: 4, fill: "none", stroke: "currentColor", "stroke-width": 1.4 }));
+  });
+  // barré
+  if (v.barre) {
+    const fy = y(v.barre.fret - v.start_fret + 0.5);
+    svg.append(svgEl("rect", { x: x(v.barre.from) - 7, y: fy - 7, width: x(v.barre.to) - x(v.barre.from) + 14, height: 14, rx: 7, fill: "#f59e0b" }));
+    svg.append(svgEl("text", { x: (x(v.barre.from) + x(v.barre.to)) / 2, y: fy + 4, "text-anchor": "middle", "font-size": 10, "font-weight": 700, fill: "#111" }, "1"));
+  }
+  // vingers
+  v.frets.forEach((f, s) => {
+    if (f <= 0) return;
+    if (v.barre && f === v.barre.fret && v.fingers[s] === 1) return;
+    const cy = y(f - v.start_fret + 0.5);
+    svg.append(svgEl("circle", { cx: x(s), cy, r: 7, fill: "#f59e0b" }));
+    if (v.fingers[s]) svg.append(svgEl("text", { x: x(s), y: cy + 3.5, "text-anchor": "middle", "font-size": 10, "font-weight": 700, fill: "#111" }, String(v.fingers[s])));
+  });
+  // nootnamen onder de snaren
+  v.notes.forEach((n, s) => {
+    if (n) svg.append(svgEl("text", { x: x(s), y: H - 6, "text-anchor": "middle", "font-size": 8.5, fill: "currentColor", opacity: 0.75 }, n));
+  });
+  return svg;
+}
+function trackChords(r) {
+  const out = [];
+  for (const s of r.sections || []) for (const c of s.chords || []) if (!out.includes(c)) out.push(c);
+  return out;
+}
+async function openChords() {
+  const r = state.lastResult;
+  if (!r) return;
+  const chords = trackChords(r);
+  $("chordTitle").textContent = `${r.title || r.folder} · ${r.key} · ${r.bpm} BPM`;
+  const secs = $("chordSections");
+  secs.innerHTML = "";
+  r.sections.forEach((s) =>
+    secs.append(el("div", { class: "flex gap-3" },
+      el("span", { class: "w-24 flex-none text-slate-400", text: s.label }),
+      el("span", { class: "font-mono text-slate-200", text: s.chords.join("  ·  ") })))
+  );
+  const grid = $("chordGrid");
+  grid.innerHTML = '<p class="text-slate-400 text-sm">Grepen berekenen…</p>';
+  $("chordModal").classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+  try {
+    const res = await api("/api/guitar-chords", { chords, key: r.key });
+    grid.innerHTML = "";
+    for (const c of res.chords) {
+      const row = el("div", { class: "chordrow border-t border-slate-800 pt-4" },
+        el("div", { class: "text-lg font-semibold text-amber-300 mb-2", text: c.symbol }));
+      const dias = el("div", { class: "grid grid-cols-2 sm:grid-cols-4 gap-3" });
+      if (!c.voicings.length) dias.append(el("p", { class: "text-sm text-slate-500", text: c.error || "Geen speelbare greep gevonden." }));
+      c.voicings.forEach((v) => {
+        const box = el("div", { class: "flex flex-col items-center" });
+        box.append(chordDiagram(v));
+        box.append(el("div", { class: "text-xs text-slate-400 mt-1", text: `${v.label} · ${v.tab}` }));
+        dias.append(box);
+      });
+      row.append(dias);
+      grid.append(row);
+    }
+  } catch (e) {
+    grid.innerHTML = "";
+    grid.append(el("p", { class: "text-red-400 text-sm", text: "Kon de akkoorden niet berekenen: " + e.message }));
+  }
+}
+function closeChords() {
+  $("chordModal").classList.add("hidden");
+  document.body.style.overflow = "";
 }
 
 // ------------------------------------------------------------------ levensduur
