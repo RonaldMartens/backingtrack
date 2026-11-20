@@ -189,6 +189,19 @@ Solo's toevoegen kan alleen bij nummers die met deze app zijn gemaakt, niet bij 
 
 Open het nummer (na het genereren, of via **Mijn nummers**) en klik **🗑 Verwijderen**. Na bevestiging gaat de hele map, met alle audio-, MIDI- en tekstbestanden, naar de **Prullenmand**. Staat het nummer op de externe schijf, dan gaat het naar de prullenmand van die schijf. Zolang je de prullenmand niet leegt, kun je het nummer terugzetten via Finder (*Zet terug*). Als het niet naar de prullenmand kan, wordt de map definitief verwijderd; de melding zegt dan welke van de twee er gebeurd is.
 
+## Zwevende vensters
+
+*Gitaarakkoorden* en *Soloschema* openen als zwevende vensters. De pagina eronder blijft bruikbaar, zodat je bijvoorbeeld de mix kunt afspelen terwijl je meekijkt.
+
+- **Verplaatsen:** sleep de titelbalk.
+- **Groter of kleiner maken:** sleep de hoek rechtsonder.
+- **Allebei tegelijk open:** klik op een venster om het naar voren te halen.
+- **Positie en grootte** worden onthouden. Dubbelklik op de titelbalk om terug te gaan naar de standaardplek.
+- **Ander nummer openen:** open vensters schakelen automatisch mee.
+- **Esc** sluit het voorste venster.
+- **🖨 Afdrukken** drukt alleen dat venster af.
+- **Op de iPhone** zijn de vensters gewoon schermvullend.
+
 ## Soloschema
 
 Klik bij een nummer op **🎼 Soloschema** (naast *Gitaarakkoorden*). Je ziet:

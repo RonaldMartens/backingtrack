@@ -162,17 +162,21 @@ function bindEvents() {
   $("btnChords").addEventListener("click", openChords);
   $("btnSoloGuide").addEventListener("click", openSoloGuide);
   $("btnCloseSolo").addEventListener("click", closeSoloGuide);
-  $("btnPrintSolo").addEventListener("click", () => window.print());
-  $("soloModal").addEventListener("click", (e) => { if (e.target.id === "soloModal") closeSoloGuide(); });
+  $("btnPrintSolo").addEventListener("click", () => printWin("soloModal"));
   $("btnSolos").addEventListener("click", () => makeSolos(false));
   $("btnRemoveSolos").addEventListener("click", () => makeSolos(true));
   $("btnAddSolo").addEventListener("click", addSoloRow);
   $("mixWithSolo").addEventListener("click", () => playMix(true));
   $("mixNoSolo").addEventListener("click", () => playMix(false));
   $("btnCloseChords").addEventListener("click", closeChords);
-  $("btnPrintChords").addEventListener("click", () => window.print());
-  $("chordModal").addEventListener("click", (e) => { if (e.target.id === "chordModal") closeChords(); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closeChords(); closeSoloGuide(); } });
+  $("btnPrintChords").addEventListener("click", () => printWin("chordModal"));
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const top = topWindow();
+    if (top === "chordModal") closeChords(); else if (top === "soloModal") closeSoloGuide();
+  });
+  initFloatWin("chordModal", { width: 900, offset: 0 });
+  initFloatWin("soloModal", { width: 1120, offset: 40 });
   $("rememberKey").addEventListener("change", () => {
     store("bt_api_key", $("rememberKey").checked ? $("apiKey").value.trim() || null : null);
   });
@@ -346,7 +350,9 @@ async function generate() {
 }
 
 function showResult(r) {
+  const prevId = state.lastResult && state.lastResult.id;
   state.lastResult = r;
+  if (r.id !== prevId) refreshOpenWindows();
   $("result").classList.remove("hidden");
   $("resTitle").textContent = r.title || r.folder;
   const genreLabel = (state.options.genres.find((g) => g.value === r.genre) || {}).label || r.genre;
@@ -568,6 +574,7 @@ async function deleteSession() {
     const out = await res.json();
     const audio = $("mixAudio"); audio.pause(); audio.removeAttribute("src");
     state.lastResult = null; state.shownId = null;
+    closeChords(); closeSoloGuide();
     $("result").classList.add("hidden");
     setStatus(out.trash ? `Verwijderd: ${r.id} staat in de Prullenmand (terug te zetten zolang je die niet leegt).`
                         : `Verwijderd: ${r.id} is definitief gewist.`);
@@ -738,8 +745,7 @@ async function openChords() {
   );
   const grid = $("chordGrid");
   grid.innerHTML = '<p class="text-slate-400 text-sm">Grepen berekenen…</p>';
-  $("chordModal").classList.remove("hidden");
-  document.body.style.overflow = "hidden";
+  showWin("chordModal");
   try {
     const res = await api("/api/guitar-chords", { chords, key: r.key });
     grid.innerHTML = "";
@@ -763,8 +769,143 @@ async function openChords() {
   }
 }
 function closeChords() {
-  $("chordModal").classList.add("hidden");
-  document.body.style.overflow = "";
+  hideWin("chordModal");
+}
+
+// ------------------------------------------------------------------ zwevende vensters
+// Akkoorden en soloschema zijn vrij verplaatsbare, vergrootbare vensters (op de telefoon schermvullend).
+// De pagina eronder blijft gewoon bruikbaar; positie en grootte worden per venster onthouden.
+
+let winZ = 50;
+const isPhone = () => window.matchMedia("(max-width: 639px)").matches;
+const winBody = (id) => $(id).querySelector(".win-body");
+
+function loadWinPos(id) {
+  try { return JSON.parse(localStorage.getItem("bt_win_" + id) || "null"); } catch (_) { return null; }
+}
+function saveWinPos(id) {
+  if (isPhone()) return;
+  const w = $(id);
+  if (w.classList.contains("hidden")) return;
+  try {
+    localStorage.setItem("bt_win_" + id, JSON.stringify({
+      left: w.offsetLeft, top: w.offsetTop, width: w.offsetWidth, height: w.offsetHeight }));
+  } catch (_) {}
+}
+
+// Houd het venster (in ieder geval de titelbalk) binnen beeld.
+function clampWin(w) {
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const width = Math.min(w.offsetWidth, vw - 16), height = Math.min(w.offsetHeight, vh - 16);
+  if (w.offsetWidth > width) w.style.width = width + "px";
+  if (w.offsetHeight > height) w.style.height = height + "px";
+  const left = Math.max(8 - width + 120, Math.min(w.offsetLeft, vw - 120));
+  const top = Math.max(8, Math.min(w.offsetTop, vh - 60));
+  w.style.left = left + "px"; w.style.top = top + "px";
+}
+
+function placeWin(id) {
+  const w = $(id), o = w._floatOpts;
+  const saved = loadWinPos(id);
+  const vw = window.innerWidth, vh = window.innerHeight;
+  if (saved) {
+    Object.assign(w.style, { left: saved.left + "px", top: saved.top + "px",
+                             width: saved.width + "px", height: saved.height + "px" });
+  } else {
+    const width = Math.min(o.width, vw - 40), height = Math.min(Math.round(vh * 0.82), vh - 40);
+    Object.assign(w.style, {
+      left: Math.max(20, Math.round((vw - width) / 2) + o.offset) + "px",
+      top: Math.max(20, Math.round((vh - height) / 2) + o.offset / 2) + "px",
+      width: width + "px", height: height + "px" });
+  }
+  clampWin(w);
+}
+
+function bringToFront(id) { $(id).style.zIndex = ++winZ; }
+
+function topWindow() {
+  let best = null, z = -1;
+  for (const id of ["chordModal", "soloModal"]) {
+    const w = $(id);
+    if (!w.classList.contains("hidden") && Number(w.style.zIndex || 50) > z) { z = Number(w.style.zIndex || 50); best = id; }
+  }
+  return best;
+}
+
+function showWin(id) {
+  const w = $(id);
+  const wasHidden = w.classList.contains("hidden");
+  w.classList.remove("hidden");
+  if (wasHidden) { placeWin(id); winBody(id).scrollTop = 0; }
+  bringToFront(id);
+  if (isPhone()) document.body.style.overflow = "hidden";
+}
+
+function hideWin(id) {
+  const w = $(id);
+  if (w.classList.contains("hidden")) return;
+  saveWinPos(id);
+  w.classList.add("hidden");
+  if (!topWindow()) document.body.style.overflow = "";
+}
+
+function printWin(id) {
+  $(id).classList.add("print-me");
+  document.body.classList.add("print-one");
+  const done = () => {
+    $(id).classList.remove("print-me");
+    document.body.classList.remove("print-one");
+    window.removeEventListener("afterprint", done);
+  };
+  window.addEventListener("afterprint", done);
+  window.print();
+  setTimeout(done, 1000);   // Safari stuurt niet altijd 'afterprint'
+}
+
+function initFloatWin(id, opts) {
+  const w = $(id), head = w.querySelector(".win-head");
+  w._floatOpts = opts;
+  w.addEventListener("pointerdown", () => bringToFront(id));
+  head.addEventListener("pointerdown", (e) => {
+    if (isPhone() || e.button !== 0 || e.target.closest("button, a, select, input")) return;
+    e.preventDefault();
+    const sx = e.clientX, sy = e.clientY, ox = w.offsetLeft, oy = w.offsetTop;
+    head.setPointerCapture(e.pointerId);
+    w.classList.add("dragging");
+    const move = (ev) => {
+      w.style.left = ox + ev.clientX - sx + "px";
+      w.style.top = oy + ev.clientY - sy + "px";
+      clampWin(w);
+    };
+    const up = () => {
+      head.removeEventListener("pointermove", move);
+      head.removeEventListener("pointerup", up);
+      head.removeEventListener("pointercancel", up);
+      w.classList.remove("dragging");
+      saveWinPos(id);
+    };
+    head.addEventListener("pointermove", move);
+    head.addEventListener("pointerup", up);
+    head.addEventListener("pointercancel", up);
+  });
+  // Dubbelklik op de titelbalk: terug naar de standaardplek en -grootte.
+  head.addEventListener("dblclick", (e) => {
+    if (isPhone() || e.target.closest("button")) return;
+    try { localStorage.removeItem("bt_win_" + id); } catch (_) {}
+    placeWin(id);
+  });
+  // Grootte via de hoek rechtsonder (CSS resize) onthouden.
+  if (window.ResizeObserver) {
+    let t = null;
+    new ResizeObserver(() => { clearTimeout(t); t = setTimeout(() => saveWinPos(id), 300); }).observe(w);
+  }
+  window.addEventListener("resize", () => { if (!w.classList.contains("hidden") && !isPhone()) clampWin(w); });
+}
+
+// Ander nummer geopend terwijl een venster openstaat: venster bijwerken naar het nieuwe nummer.
+function refreshOpenWindows() {
+  if (!$("chordModal").classList.contains("hidden")) openChords();
+  if (!$("soloModal").classList.contains("hidden")) openSoloGuide();
 }
 
 // ------------------------------------------------------------------ soloschema
@@ -843,8 +984,7 @@ async function openSoloGuide() {
   if (!r) return;
   $("sgTitle").textContent = `${r.title || r.folder} · ${r.key} · ${r.bpm} BPM`;
   $("sgBody").innerHTML = '<p class="text-slate-400 text-sm">Soloschema berekenen…</p>';
-  $("soloModal").classList.remove("hidden");
-  document.body.style.overflow = "hidden";
+  showWin("soloModal");
   try {
     sg.data = await api("/api/solo-guide", {
       key: r.key, genre: r.genre || "",
@@ -859,9 +999,7 @@ async function openSoloGuide() {
 }
 
 function closeSoloGuide() {
-  if ($("soloModal").classList.contains("hidden")) return;
-  $("soloModal").classList.add("hidden");
-  document.body.style.overflow = "";
+  hideWin("soloModal");
 }
 
 function sgButton(text, on, onClick, cls = "scale-chip") {
@@ -918,7 +1056,7 @@ function renderSoloGuide() {
     const card = el("button", { class: `chordrow text-left rounded-lg p-2 border ${sg.box === b.number ? "border-amber-500 bg-amber-500/10" : "border-slate-800 bg-slate-900/40 hover:border-slate-600"}` });
     card.append(el("div", { class: "text-xs text-slate-300 mb-1", text: `Positie ${b.number}${b.root_on_low_e ? " ★" : ""} · fret ${b.from}–${b.to}` }));
     card.append(fretboard({ data: d, scale, box: b, chord: null, labels: sg.labels, from: Math.max(0, b.from - (b.from > 0 ? 1 : 0)), to: b.to + 1, mini: true }));
-    card.addEventListener("click", () => { sg.box = b.number; renderSoloGuide(); $("soloModal").scrollTo({ top: 0, behavior: "smooth" }); });
+    card.addEventListener("click", () => { sg.box = b.number; renderSoloGuide(); winBody("soloModal").scrollTo({ top: 0, behavior: "smooth" }); });
     grid.append(card);
   });
   body.append(grid);
@@ -961,7 +1099,7 @@ function renderSoloGuide() {
         sg.chord = on ? null : c;
         if (!on && c.fits && c.fits.length && !c.fits.includes(sg.scale)) sg.scale = c.fits[0];
         renderSoloGuide();
-        $("soloModal").scrollTo({ top: 0, behavior: "smooth" });
+        winBody("soloModal").scrollTo({ top: 0, behavior: "smooth" });
       });
       chordsRow.append(b);
     });

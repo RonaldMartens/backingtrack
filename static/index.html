@@ -41,8 +41,33 @@
     .fretboard { color: #cbd5e1; }
     .scale-chip { padding: .35rem .7rem; border-radius: 999px; border: 1px solid #334155; font-size: .8rem; }
     .scale-chip.on { border-color: #f59e0b; color: #fbbf24; background: rgba(245,158,11,.12); }
+    /* zwevende vensters (akkoorden / soloschema) */
+    .float-win { position: fixed; z-index: 50; left: 40px; top: 70px; width: 900px; height: 80vh;
+                 min-width: 320px; min-height: 220px; resize: both; overflow: hidden;
+                 border-radius: 1rem; box-shadow: 0 20px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(245,158,11,.15); }
+    .float-win > .chordsheet { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+    .win-head { cursor: move; user-select: none; -webkit-user-select: none; touch-action: none;
+                padding: .9rem 1rem .6rem; border-bottom: 1px solid #262b36; flex: none; }
+    .win-head button { cursor: pointer; }
+    .win-grip { color: #475569; font-size: .8rem; letter-spacing: -1px; }
+    .win-body { flex: 1; overflow: auto; padding: 0 1rem 1rem; }
+    .float-win.dragging { opacity: .92; }
+    .float-win.dragging, .float-win.dragging * { cursor: grabbing !important; }
+    @media (min-width: 640px) { .win-body { padding: 0 1.5rem 1.5rem; } .win-head { padding: 1rem 1.5rem .7rem; } }
+    @media (max-width: 639px) {      /* telefoon: gewoon schermvullend */
+      .float-win { left: 0 !important; top: 0 !important; width: 100% !important; height: 100% !important;
+                   border-radius: 0; resize: none; box-shadow: none; }
+      .float-win > .chordsheet { border-radius: 0; border: 0; }
+      .win-head { cursor: default; } .win-grip { display: none; }
+    }
     @media print {
       body { background: #fff !important; }
+      body.print-one .modal:not(.print-me) { display: none !important; }
+      .float-win { width: auto !important; height: auto !important; box-shadow: none !important; resize: none !important; }
+      .float-win > .chordsheet { height: auto !important; display: block !important; overflow: visible !important; }
+      .win-body { overflow: visible !important; padding: 0 !important; }
+      .win-head { border: 0 !important; padding: 0 0 .5rem !important; }
+      .win-grip { display: none !important; }
       body > *:not(.modal) { display: none !important; }
       .modal.hidden { display: none !important; }
       .modal { position: static !important; display: block !important; background: #fff !important; overflow: visible !important; }
@@ -288,11 +313,11 @@
   </main>
 
   <!-- Gitaarakkoorden-overzicht -->
-  <div id="chordModal" class="modal hidden fixed inset-0 z-50 bg-black/75 overflow-y-auto">
-    <div class="chordsheet card max-w-5xl mx-auto my-4 sm:my-8 p-4 sm:p-6">
-      <div class="flex items-start justify-between gap-3 mb-1">
+  <div id="chordModal" class="modal float-win hidden" role="dialog" aria-label="Gitaarakkoorden">
+    <div class="chordsheet card">
+      <div class="win-head flex items-start justify-between gap-3" title="Sleep om te verplaatsen">
         <div class="min-w-0">
-          <h2 class="text-lg font-semibold">🎸 Gitaarakkoorden</h2>
+          <h2 class="text-lg font-semibold"><span class="win-grip mr-1">⠿</span>🎸 Gitaarakkoorden</h2>
           <p id="chordTitle" class="text-sm text-slate-400 truncate"></p>
         </div>
         <div class="flex gap-2 noprint flex-none">
@@ -300,18 +325,20 @@
           <button id="btnCloseChords" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm" title="Sluiten (Esc)">✕</button>
         </div>
       </div>
-      <div id="chordSections" class="text-sm mt-3 grid gap-1"></div>
-      <p class="text-xs text-slate-500 mt-3 noprint">Standaardstemming E A D G B E · per akkoord 4 posities op de hals · cijfers = vingers (1 wijsvinger … 4 pink) · x = niet aanslaan, o = open snaar</p>
-      <div id="chordGrid" class="mt-4 grid gap-5"></div>
+      <div class="win-body">
+        <div id="chordSections" class="text-sm mt-3 grid gap-1"></div>
+        <p class="text-xs text-slate-500 mt-3 noprint">Standaardstemming E A D G B E · per akkoord 4 posities op de hals · cijfers = vingers (1 wijsvinger … 4 pink) · x = niet aanslaan, o = open snaar</p>
+        <div id="chordGrid" class="mt-4 grid gap-5"></div>
+      </div>
     </div>
   </div>
 
   <!-- Soloschema -->
-  <div id="soloModal" class="modal hidden fixed inset-0 z-50 bg-black/75 overflow-y-auto">
-    <div class="chordsheet card max-w-6xl mx-auto my-4 sm:my-8 p-4 sm:p-6">
-      <div class="flex items-start justify-between gap-3 mb-1">
+  <div id="soloModal" class="modal float-win hidden" role="dialog" aria-label="Soloschema">
+    <div class="chordsheet card">
+      <div class="win-head flex items-start justify-between gap-3" title="Sleep om te verplaatsen">
         <div class="min-w-0">
-          <h2 class="text-lg font-semibold">🎼 Soloschema</h2>
+          <h2 class="text-lg font-semibold"><span class="win-grip mr-1">⠿</span>🎼 Soloschema</h2>
           <p id="sgTitle" class="text-sm text-slate-400 truncate"></p>
         </div>
         <div class="flex gap-2 noprint flex-none">
@@ -319,7 +346,7 @@
           <button id="btnCloseSolo" class="btn bg-slate-700 hover:bg-slate-600 text-white text-sm" title="Sluiten (Esc)">✕</button>
         </div>
       </div>
-      <div id="sgBody" class="mt-3"></div>
+      <div class="win-body"><div id="sgBody" class="mt-3"></div></div>
     </div>
   </div>
 
